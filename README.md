@@ -1,27 +1,86 @@
-# React Kanban Board
+# React Kanban Board (高性能看板组件)
 
-一个功能完备、高度可扩展且支持双维度拖拽的 React 看板应用。
+一个基于 React 构建的模块化看板系统。采用 **Hooks + Components + Styles** 架构实现，支持双维度原生拖拽、内联编辑及高度自适应布局。
 
-## 🚀 关键功能与项目特色
-* **响应式且高度可扩展**：采用 Hooks + Components + Styles 分离的模块化架构，易于快速集成。
-* **原生双维度拖拽**：实现卡片跨通道移动、通道内排序，以及通道（Lane）本身的左右排序。
-* **精细化内联编辑**：支持卡片标题与描述的独立点击编辑，并带有悬停修改提示。
-* **智能自适应布局**：高度随内容动态伸缩，长文本自动折行（防止溢出），支持通道内独立滚动。
-* **性能优化**：核心组件使用 `React.memo` 配合 `useCallback` 钩子，确保极致的渲染性能。
+---
 
-## ⚙️ 技术参数 (Documentation)
+## 🚀 核心特性
 
-### Callbacks and Handlers
-| 函数名 | 触发时机 |
-| :--- | :--- |
-| addCard | 点击通道底部“添加卡片”按钮时触发 |
-| addLane | 点击末尾“添加新列”虚线框时触发 |
-| updateCardText | 点击卡片标题部分时触发 |
-| updateCardDescription | 点击卡片描述部分时触发 |
-| deleteCard | 点击卡片右侧“删除”按钮时触发 |
+* **响应式且高度可扩展**：可以轻松插入现有的 React 应用中。
+* **双向拖拽**：支持卡片在通道间移动，以及通道（Lane）本身的左右排序。
+* **高度自适应**：通道高度随卡片数量自动伸缩，支持内部独立分页滚动。
+* **即时编辑**：支持内联编辑卡片内容及通道标题，无需弹窗。
+* **自定义元素**：支持自定义元素用于定义通道和卡片外观。
+* **事件总线**：触发外部事件（例如：根据来自后端的事件添加或移除卡片）。
 
-## 🛠️ 安装与启动
+---
 
-1. **克隆项目**:
+## ⚙️ 技术文档 (Documentation)
+
+### 1. 必填参数 (Required Parameters)
+| 参数名 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `data` | `Array` | 看板核心数据，包含通道 ID、标题及卡片列表。 |
+| `onDragStart` | `Function` | 开始拖动卡片时的回调函数。 |
+| `onDrop` | `Function` | 放下卡片并更新数据逻辑的回调。 |
+
+### 2. 可选配置 (Optionable Flags)
+| 参数名 | 类型 | 默认值 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `draggable` | `Boolean` | `true` | 是否允许拖拽卡片和通道。 |
+| `isEditable` | `Boolean` | `true` | 是否开启内联点击编辑功能。 |
+| `draggedCardId` | `String` | `null` | 当前被拖拽卡片的 ID（用于样式反馈）。 |
+
+### 3. 通道专属属性 (Lane Specific Props)
+| 属性名 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `lane.id` | `String` | 通道的唯一标识符。 |
+| `lane.title` | `String` | 通道的标题。 |
+| `lane.cards` | `Array` | 属于该通道的卡片对象数组。 |
+
+### 4. 其他功能函数 (Other Functions)
+| 函数名 | 说明 | 触发方式 |
+| :--- | :--- | :--- |
+| `addLane` | 动态添加新列 | 点击页面右侧“添加新列”占位块 |
+| `addCard` | 在指定列添加卡片 | 点击通道下方的“+ 添加卡片”按钮 |
+| `deleteCard` | 删除指定任务 | 点击卡片右上角的删除图标 |
+
+---
+
+## 🎨 样式自定义 (Style Customization)
+
+你可以通过修改 `src/styles/kanbanStyles.js` 来快速调整视觉风格：
+
+* **通道宽度**：修改 `lane.width` (默认 `280px`)。
+* **最大高度**：修改 `lane.maxHeight` (默认 `85vh`) 实现屏幕适配。
+* **配色方案**：
+    * 通道背景：`#e5eaf3`
+    * 卡片背景：`#f8f9fc`
+    * 页面背景：`#b0bece`
+
+---
+
+## 🛠️ 快速上手
+
+1. **安装依赖**:
    ```bash
-   git clone [你的仓库地址]
+   npm install
+2. **启动项目**:
+
+    ```bash
+    npm run dev
+3. **生产构建**:
+    ```bash
+    npm run build
+
+---
+
+## 📂 目录结构
+
+```text
+src/
+├── components/       # UI 组件 (Lane.jsx)
+├── hooks/            # 业务逻辑 (useKanban.js)
+├── styles/           # 样式定义 (kanbanStyles.js)
+├── App.jsx           # 页面入口与组装
+└── main.jsx          # React 挂载点
