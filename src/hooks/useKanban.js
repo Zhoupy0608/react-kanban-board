@@ -24,7 +24,14 @@ export function useKanban() {
     const initData = async () => {
     try {
       const resData = await boardService.getBoard();
-      setData(resData);
+      const normalized = (resData || []).map((lane) => ({
+        ...lane,
+        cards: (lane.cards || []).map((card) => ({
+          ...card,
+          tags: Array.isArray(card.tags) ? card.tags : [],
+        })),
+      }));
+      setData(normalized);
     } catch (err) {
       console.log("初始化失败，请检查后端服务是否启动");
     }
@@ -33,24 +40,46 @@ export function useKanban() {
   initData();
   }, []);
 
-  // 封装一个通用的同步函数 326
-  const persistData = (newData) => {
-    setData(newData);// 更新本地状态
-    boardService.updateBoard(newData); //发送给后端
-  };
+  // 封装一个通用的同步函数：乐观更新 UI + 等待后端同步
+  const persistData = useCallback(async (newData) => {
+    setData(newData); // 先更新本地状态，保证 UI 立刻响应
+    try {
+      await boardService.updateBoard(newData); // 再同步到后端
+    } catch (err) {
+      // demo 场景下不回滚 UI；至少把错误打印出来便于排查
+      console.error('同步数据到后端失败:', err);
+    }
+  }, []);
 
   // 功能 1：添加卡片
-  const addCard = useCallback((laneId) => {
-    const text = prompt("请输入任务内容:");
-    if (!text) return;   
-    // setData(prev => prev.map(lane => 
-    //   lane.id === laneId ? { ...lane, cards: [...lane.cards, { id: Date.now().toString(), text }] } : lane
-    // ));
-    const newData = data.map(lane => 
-      lane.id === laneId ? { ...lane, cards: [...lane.cards, { id: Date.now().toString(), text }] } : lane
+  const addCard = useCallback((laneId, text, tags = []) => {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return;
+
+    const normalizedTags = [...new Set(
+      (Array.isArray(tags) ? tags : String(tags).split(/[,，]/))
+        .map((t) => String(t).trim())
+        .filter(Boolean)
+    )];
+
+    const newData = data.map(lane =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            cards: [
+              ...lane.cards,
+              {
+                id: Date.now().toString(),
+                text: trimmed,
+                description: '',
+                tags: normalizedTags,
+              },
+            ],
+          }
+        : lane
     );
-    persistData(newData); // 同步到本地和后端
-  }, [data]); // 依赖于 data
+    persistData(newData);
+  }, [data, persistData]);
 
   // 功能 2：删除卡片 
   const deleteCard = useCallback((laneId, cardId) => {
@@ -58,7 +87,7 @@ export function useKanban() {
       lane.id === laneId ? { ...lane, cards: lane.cards.filter(c => c.id !== cardId) } : lane
     );
     persistData(newData);
-  }, [data]);// 依赖于 data
+  }, [data, persistData]);
 
   // 功能 3：拖拽卡片 
   // A. 当开始拖拽时：记录身份
@@ -130,55 +159,72 @@ export function useKanban() {
     setDraggedCard(null); // 清空临时状态
   }, [draggedCard, data]); // 依赖于拖动的卡片信息和数据
 
-  // 功能 4：单独修改标题
-const updateCardText = useCallback((laneId, cardId, oldText) => {
-  const newText = prompt('修改任务标题：', oldText);
-  if (newText === null || newText === oldText) return; // 取消或没改则跳过
+  // 功能 4：修改标题
+  const updateCardText = useCallback((laneId, cardId, newText) => {
+    const trimmed = (newText || '').trim();
+    if (!trimmed) return;
 
-  // setData(prev => prev.map(lane => 
-  //   lane.id === laneId ? {
-  //     ...lane,
-  //     cards: lane.cards.map(card => card.id === cardId ? { ...card, text: newText } : card)
-  //   } : lane
-  // ));
-  const newData = data.map(lane => 
-    lane.id === laneId ? {
-      ...lane,
-      cards: lane.cards.map(card => card.id === cardId ? { ...card, text: newText } : card)
-    } : lane
-  );
-  persistData(newData);
-}, [data]);
+    const newData = data.map(lane =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            cards: lane.cards.map(card =>
+              card.id === cardId ? { ...card, text: trimmed } : card
+            ),
+          }
+        : lane
+    );
+    persistData(newData);
+  }, [data, persistData]);
 
-// 功能 5：单独修改描述
-const updateCardDescription = useCallback((laneId, cardId, oldDesc) => {
-  const newDesc = prompt('修改任务描述：', oldDesc || '');
-  if (newDesc === null || newDesc === oldDesc) return;
+  // 功能 5：修改描述
+  const updateCardDescription = useCallback((laneId, cardId, newDesc) => {
+    const description = newDesc ?? '';
 
-  // setData(prev => prev.map(lane => 
-  //   lane.id === laneId ? {
-  //     ...lane,
-  //     cards: lane.cards.map(card => card.id === cardId ? { ...card, description: newDesc } : card)
-  //   } : lane
-  // ));
-  const newData = data.map(lane => 
-    lane.id === laneId ? {
-      ...lane,
-      cards: lane.cards.map(card => card.id === cardId ? { ...card, description: newDesc } : card)
-    } : lane
-  );
-  persistData(newData);
-}, [data]);
+    const newData = data.map(lane =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            cards: lane.cards.map(card =>
+              card.id === cardId ? { ...card, description } : card
+            ),
+          }
+        : lane
+    );
+    persistData(newData);
+  }, [data, persistData]);
+
+  // 功能 5b：修改标签
+  const updateCardTags = useCallback((laneId, cardId, tags = []) => {
+    const normalizedTags = [...new Set(
+      (Array.isArray(tags) ? tags : String(tags).split(/[,，]/))
+        .map((t) => String(t).trim())
+        .filter(Boolean)
+    )];
+
+    const newData = data.map(lane =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            cards: lane.cards.map(card =>
+              card.id === cardId ? { ...card, tags: normalizedTags } : card
+            ),
+          }
+        : lane
+    );
+    persistData(newData);
+  }, [data, persistData]);
 
 
   // 功能 6：列交换
   // A. 当开始拖拽列时：记录被拖动的列索引
-  const onLaneDragStart = (index) => {
+  const onLaneDragStart = useCallback((index) => {
     setdraggedLaneIdx(index);
-  };
+  }, []);
+
   // B. 鼠标放下时
-  const onLaneDrop = (targetIndex) => {
-    if(draggedLaneIdx === null || draggedLaneIdx === targetIndex) return;
+  const onLaneDrop = useCallback((targetIndex) => {
+    if (draggedLaneIdx === null || draggedLaneIdx === targetIndex) return;
 
     const newData = [...data];
     const movedLane = newData.splice(draggedLaneIdx, 1)[0]; // 取出被拖动的列
@@ -186,21 +232,20 @@ const updateCardDescription = useCallback((laneId, cardId, oldDesc) => {
 
     persistData(newData);
     setdraggedLaneIdx(null);
-  };
+  }, [data, draggedLaneIdx, persistData]);
 
   // 功能 7：新增列
-  const addLane = useCallback(() => {
-    const title = prompt("请输入新列的名称:");
-    if (!title) return;
+  const addLane = useCallback((title) => {
+    const trimmed = (title || '').trim();
+    if (!trimmed) return;
 
     const newLane = {
-        id: `lane-${Date.now()}`, // 使用时间戳生成唯一ID
-        title: title,
-        cards: []
+      id: `lane-${Date.now()}`,
+      title: trimmed,
+      cards: [],
     };
-    //setData(prev => [...prev, newLane]);
     persistData([...data, newLane]);
-  }, [data]);
+  }, [data, persistData]);
 
     return {
         data,
@@ -210,6 +255,7 @@ const updateCardDescription = useCallback((laneId, cardId, oldDesc) => {
         deleteCard,
         updateCardText,
         updateCardDescription,
+        updateCardTags,
         onDragStart: (laneId, cardId) => setDraggedCard({ laneId, cardId }),
         // ... 返回所有 App 需要用的方法
         onDragOver: (e) => e.preventDefault(),
@@ -217,8 +263,8 @@ const updateCardDescription = useCallback((laneId, cardId, oldDesc) => {
             if (!draggedCard) return;
             onDrop(targetLaneId, targetCardId);
         },
-        onLaneDragStart: (index) => setdraggedLaneIdx(index),
-        onLaneDrop: (targetIndex) => onLaneDrop(targetIndex)
+        onLaneDragStart,
+        onLaneDrop
     };
 }
 
