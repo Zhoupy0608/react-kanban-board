@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "start": "node server.js",
+    "start:prod": "npm run build && node server.js --prod",
+    "dev": "node server.js",
+    "dev:vite": "vite",
     "server": "node server.js",
     "build": "vite build",
     "lint": "eslint .",

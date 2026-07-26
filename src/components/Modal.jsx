@@ -1,11 +1,20 @@
 import { useEffect, useRef } from 'react';
 import { styles } from '../styles/kanbanStyles';
 
-export function Modal({ open, title, onClose, onSubmit, submitLabel = '确定', children }) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  onSubmit,
+  submitLabel = '确定',
+  cancelLabel = '取消',
+  danger = false,
+  children,
+}) {
   const panelRef = useRef(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -16,10 +25,12 @@ export function Modal({ open, title, onClose, onSubmit, submitLabel = '确定', 
 
   useEffect(() => {
     if (!open || !panelRef.current) return;
-    const focusable = panelRef.current.querySelector('input, textarea');
+    const focusable = panelRef.current.querySelector(
+      danger ? '.modal-submit, .modal-submit-danger' : 'input, textarea, .modal-submit, .modal-submit-danger'
+    );
     focusable?.focus();
     if (focusable?.select) focusable.select();
-  }, [open]);
+  }, [open, danger]);
 
   if (!open) return null;
 
@@ -48,9 +59,13 @@ export function Modal({ open, title, onClose, onSubmit, submitLabel = '确定', 
           {children}
           <div style={styles.modalActions}>
             <button type="button" style={styles.modalCancelBtn} onClick={onClose}>
-              取消
+              {cancelLabel}
             </button>
-            <button type="submit" style={styles.modalSubmitBtn}>
+            <button
+              type="submit"
+              className={danger ? 'modal-submit-danger' : 'modal-submit'}
+              style={danger ? undefined : styles.modalSubmitBtn}
+            >
               {submitLabel}
             </button>
           </div>

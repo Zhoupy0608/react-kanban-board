@@ -1,75 +1,75 @@
+export const LANE_ACCENTS = [
+  { bg: '#fce7f3', dot: '#ec4899' }, // pink
+  { bg: '#ffedd5', dot: '#f97316' }, // orange
+  { bg: '#dbeafe', dot: '#3b82f6' }, // blue
+  { bg: '#ede9fe', dot: '#8b5cf6' }, // lavender
+  { bg: '#dcfce7', dot: '#22c55e' }, // green
+  { bg: '#f3f4f6', dot: '#6b7280' }, // grey
+];
+
+const TITLE_ACCENT = {
+  待处理: LANE_ACCENTS[0],
+  'To Do': LANE_ACCENTS[0],
+  进行中: LANE_ACCENTS[1],
+  'In Progress': LANE_ACCENTS[1],
+  已完成: LANE_ACCENTS[3],
+  Completed: LANE_ACCENTS[3],
+  新任务: LANE_ACCENTS[2],
+  'In Review': LANE_ACCENTS[2],
+};
+
+export function getLaneAccent(title, index = 0) {
+  return TITLE_ACCENT[title] || LANE_ACCENTS[index % LANE_ACCENTS.length];
+}
+
+/** Map first tag / urgency keywords to a priority chip style */
+export function getPriorityFromTags(tags = []) {
+  const list = tags.map((t) => String(t).toLowerCase());
+  if (list.some((t) => /紧急|urgent|high|高/.test(t))) {
+    return { label: tags.find((t) => /紧急|urgent|high|高/i.test(t)) || 'High', tone: 'high' };
+  }
+  if (list.some((t) => /中|medium|一般/.test(t))) {
+    return { label: tags.find((t) => /中|medium|一般/i.test(t)) || 'Medium', tone: 'medium' };
+  }
+  if (list.some((t) => /低|low/.test(t))) {
+    return { label: tags.find((t) => /低|low/i.test(t)) || 'Low', tone: 'low' };
+  }
+  if (tags[0]) return { label: tags[0], tone: 'tag' };
+  return null;
+}
+
 export const styles = {
-  lane:{
-    background: '#e2e4e7', // 浅灰色背景
-    width: '360px',
-    borderRadius: '8px',
-    padding: '12px',
-    marginRight: '8px',
-    boxShadow: '0 2px 4px rgba(179, 168, 168, 0.05)',
-    display: 'flex',
-    height: 'fit-content',
-    flexDirection: 'column',
-    maxHeight: '85vh',
-    alignSelf: 'flex-start',
+  boardRow: {
+    // layout handled by .board-row CSS
   },
-  card: {
-    minHeight: '60px',
-    background: '#fefeff',
-    padding: '16px',
-    marginBottom: '18px',
-    borderRadius: '8px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    cursor: 'grab',
-    transition: 'all 0.2s ease', // 增加平滑过渡
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    fontSize: '14px',
-    color: '#172b4d',
-    overflow: 'hidden', // 确保圆角处不会溢出
-  },
-  addButton: {
-    width: '100%',
-    padding: '8px',
-    marginTop: '4px',
-    cursor: 'pointer',
-    border: 'none',
-    borderRadius: '4px',
-    background: 'transparent',
-    color: '#5e6c84',
-    textAlign: 'left',
-    fontSize: '14px',
-    transition: 'background 0.2s',
-  },
-  addLaneBtn: {
-    minWidth: '280px',
-    height: '50px',
-    background: 'rgba(255, 255, 255, 0.2)', // 半透明白
-    border: '2px dashed #ffffff',
-    borderRadius: '8px',
+  filterRow: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    color: '#ffffff',
-    fontWeight: 'bold',
-    transition: 'background 0.2s',
+    gap: '10px',
+    flexWrap: 'wrap',
+  },
+  tagList: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+    marginTop: '10px',
   },
   deleteBtn: {
-    fontSize: '20px', 
-    flexShrink: 0, // 强制按钮不被压缩，永远保持原有大小
+    fontSize: '18px',
+    lineHeight: 1,
+    flexShrink: 0,
     border: 'none',
-    background: 'none',
-    color: '#2b1a4e',
+    background: 'transparent',
+    color: 'var(--ink-muted)',
     cursor: 'pointer',
-    opacity: 0.6,
-    padding: '0 6px',
-    borderRadius: '4px',
+    padding: '2px 6px',
+    borderRadius: '6px',
   },
   modalOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(23, 43, 77, 0.45)',
+    background: 'rgba(17, 24, 39, 0.35)',
+    backdropFilter: 'blur(2px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -79,46 +79,51 @@ export const styles = {
   modalPanel: {
     width: '100%',
     maxWidth: '420px',
-    background: '#ffffff',
-    borderRadius: '10px',
-    padding: '20px',
-    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.18)',
+    background: '#fff',
+    borderRadius: '16px',
+    padding: '22px',
+    boxShadow: '0 20px 48px rgba(17, 24, 39, 0.18)',
+    border: '1px solid var(--line)',
   },
   modalTitle: {
     margin: '0 0 16px',
-    fontSize: '18px',
-    color: '#172b4d',
+    fontFamily: 'var(--font-display)',
+    fontSize: '1.15rem',
+    fontWeight: 700,
+    color: 'var(--ink)',
+    letterSpacing: '-0.02em',
   },
   modalLabel: {
     display: 'block',
     marginBottom: '6px',
     fontSize: '13px',
-    color: '#5e6c84',
+    color: 'var(--ink-muted)',
+    fontWeight: 500,
   },
   modalInput: {
     width: '100%',
-    boxSizing: 'border-box',
     padding: '10px 12px',
     marginBottom: '14px',
-    border: '1px solid #dfe1e6',
-    borderRadius: '6px',
+    border: '1px solid var(--line)',
+    borderRadius: '10px',
     fontSize: '14px',
-    color: '#172b4d',
+    color: 'var(--ink)',
     outline: 'none',
+    background: '#fff',
   },
   modalTextarea: {
     width: '100%',
-    boxSizing: 'border-box',
     padding: '10px 12px',
     marginBottom: '14px',
-    border: '1px solid #dfe1e6',
-    borderRadius: '6px',
+    border: '1px solid var(--line)',
+    borderRadius: '10px',
     fontSize: '14px',
-    color: '#172b4d',
+    color: 'var(--ink)',
     outline: 'none',
     minHeight: '96px',
     resize: 'vertical',
     fontFamily: 'inherit',
+    background: '#fff',
   },
   modalActions: {
     display: 'flex',
@@ -127,127 +132,23 @@ export const styles = {
     marginTop: '4px',
   },
   modalCancelBtn: {
-    padding: '8px 14px',
+    padding: '9px 14px',
     border: 'none',
-    borderRadius: '6px',
-    background: '#ebecf0',
-    color: '#172b4d',
+    borderRadius: '999px',
+    background: '#f3f4f6',
+    color: 'var(--ink)',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: 500,
   },
   modalSubmitBtn: {
-    padding: '8px 14px',
+    padding: '9px 16px',
     border: 'none',
-    borderRadius: '6px',
-    background: '#0052cc',
-    color: '#ffffff',
+    borderRadius: '999px',
+    background: 'var(--accent)',
+    color: 'var(--accent-ink)',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: 700,
   },
-  appShell: {
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: '100vh',
-    minWidth: '100vw',
-    backgroundColor: '#b0bece',
-  },
-  boardRow: {
-    display: 'flex',
-    padding: '12px 20px 20px',
-    gap: '8px',
-    alignItems: 'flex-start',
-    overflowX: 'auto',
-    flex: 1,
-  },
-  filterBar: {
-    margin: '16px 20px 0',
-    padding: '14px 16px',
-    background: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: '10px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
-  filterRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    flexWrap: 'wrap',
-  },
-  filterSearch: {
-    flex: 1,
-    minWidth: '220px',
-    boxSizing: 'border-box',
-    padding: '10px 12px',
-    border: '1px solid #dfe1e6',
-    borderRadius: '6px',
-    fontSize: '14px',
-    color: '#172b4d',
-    outline: 'none',
-  },
-  filterClearBtn: {
-    padding: '8px 12px',
-    border: 'none',
-    borderRadius: '6px',
-    background: '#ebecf0',
-    color: '#172b4d',
-    cursor: 'pointer',
-    fontSize: '13px',
-  },
-  filterMeta: {
-    fontSize: '13px',
-    color: '#5e6c84',
-    whiteSpace: 'nowrap',
-  },
-  filterLabel: {
-    fontSize: '13px',
-    color: '#5e6c84',
-    minWidth: '48px',
-  },
-  filterChips: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    flex: 1,
-  },
-  filterChip: {
-    padding: '6px 10px',
-    border: '1px solid #dfe1e6',
-    borderRadius: '6px',
-    background: '#ffffff',
-    color: '#172b4d',
-    cursor: 'pointer',
-    fontSize: '13px',
-  },
-  filterChipActive: {
-    borderColor: '#0052cc',
-    background: '#deebff',
-    color: '#0052cc',
-  },
-  filterEmpty: {
-    fontSize: '13px',
-    color: '#97a0af',
-  },
-  tagList: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '6px',
-    marginTop: '10px',
-  },
-  tagChip: {
-    padding: '2px 8px',
-    borderRadius: '4px',
-    background: '#e9f2ff',
-    color: '#0052cc',
-    fontSize: '12px',
-  },
-  tagEditHint: {
-    marginTop: '10px',
-    fontSize: '12px',
-    color: '#97a0af',
-    cursor: 'pointer',
-    borderBottom: '1px dashed #ccc',
-    display: 'inline-block',
-  },
-}
+};
