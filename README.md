@@ -70,26 +70,33 @@ npm start
 
 ---
 
-## 部署（可选）
+## 界面预览
 
-### Docker
+侧边栏可在四种视图间切换：
 
-```bash
-docker build -t mykanban .
-docker run -p 5000:5000 -v kanban-data:/data mykanban
-```
+### 概览
 
-容器内数据库目录由环境变量 `DATA_DIR` 控制（默认 `/data`）。
+统计列分布、标签分布与需关注的到期任务。
 
-### Render 等 PaaS
+![概览视图](docs/screenshots/overview.png)
 
-仓库含 `render.yaml` / `Dockerfile`。构建：`npm ci && npm run build`，启动：`node server.js --prod`。常用环境变量：
+### 看板
 
-| 变量 | 说明 |
-| --- | --- |
-| `PORT` / `HOST` | 监听端口与地址 |
-| `DATA_DIR` | 持久盘路径（无持久盘则重启可能丢数据） |
-| `APP_URL` / `RENDER_EXTERNAL_URL` | 启动日志中打印的访问地址 |
+多列拖拽排期，支持列管理与卡片标签、截止日期。
+
+![看板视图](docs/screenshots/board.png)
+
+### 列表
+
+表格形式浏览全部任务，支持排序与筛选。
+
+![列表视图](docs/screenshots/list.png)
+
+### 日历
+
+按日期查看与拖拽改期；未排期任务可拖到日期格子上。
+
+![日历视图](docs/screenshots/calendar.png)
 
 ---
 
