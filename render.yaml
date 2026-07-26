@@ -3,14 +3,11 @@ services:
     name: mykanban
     runtime: node
     plan: free
+    region: singapore
     buildCommand: npm ci && npm run build
     startCommand: node server.js --prod
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATA_DIR
-        value: /var/data
-    disk:
-      name: mykanban-data
-      mountPath: /var/data
-      sizeGB: 1
+        value: /opt/render/project/src/data
