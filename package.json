@@ -11,7 +11,9 @@
     "server": "node server.js",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "share": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/share.ps1",
+    "share:auth": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/share-auth.ps1"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

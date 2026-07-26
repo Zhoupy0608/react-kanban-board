@@ -18,7 +18,10 @@ RUN npm run build
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=5000
-ENV DATA_DIR=/var/data
+# Hugging Face / 无持久盘时用容器内目录
+ENV DATA_DIR=/data
+
+RUN mkdir -p /data
 
 EXPOSE 5000
 

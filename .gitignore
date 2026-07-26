@@ -15,6 +15,9 @@ dist-ssr
 # SQLite 本地数据库
 data/
 
+# 本地下载的内网穿透工具
+tools/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
