@@ -1,6 +1,8 @@
 # React Kanban Board（前后端一体版）
 
-模块化看板：**Vite + React** 前端 + **Express + SQLite** 后端。开发与生产共用固定入口 **http://localhost:5000**，数据持久化到本地数据库。
+面向个人与小团队的轻量看板：拖拽排期、多视图切换、标签与截止日期筛选，数据落在本机 SQLite，前后端同进程启动，改完即同步。
+
+技术上由 **Vite + React** 界面、**Express** API 与 **better-sqlite3** 组成；开发与生产共用同一端口，无需拆成两套服务。
 
 仓库：[Zhoupy0608/react-kanban-board](https://github.com/Zhoupy0608/react-kanban-board)
 
@@ -38,16 +40,16 @@ npm install
 npm start
 ```
 
-浏览器打开：**http://localhost:5000**
+启动成功后，按终端提示的访问地址打开即可（默认端口 **5000**）。
 
 | 命令 | 说明 |
 | --- | --- |
-| `npm start` / `npm run dev` | 开发模式：Express + Vite HMR，端口 **5000** |
+| `npm start` / `npm run dev` | 开发模式：Express + Vite HMR，默认端口 **5000** |
 | `npm run build` | 构建前端到 `dist/` |
 | `npm run start:prod` | 构建并以生产模式启动（静态资源 + API） |
 | `npm run share` | 用 cpolar 把本机 5000 暴露到公网（需已安装 cpolar） |
 
-> 不必再分别启动 5173 前端和 5000 后端；一个进程即可。
+> 不必再分别启动前端与后端；一个进程即可。
 
 ---
 
@@ -55,9 +57,9 @@ npm start
 
 适合临时给同事演示。本机需保持开机，且 `npm start` 与隧道进程都不退出。
 
-1. 先执行 `npm start`，确认本机 `http://localhost:5000` 正常
+1. 先执行 `npm start`，确认本机服务在端口 **5000** 正常
 2. 另开终端执行 `npm run share`（或手动：`cpolar http 5000`）
-3. 终端会输出形如 `https://xxxx.r8.cpolar.cn` 的地址，发给他人即可访问
+3. 终端会输出形如 `https://xxxx.r8.cpolar.cn` 的公网地址，发给他人即可访问
 
 说明：
 
