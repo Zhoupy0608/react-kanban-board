@@ -139,9 +139,24 @@ export function Lane({
                 <div className="card-desc is-empty">暂无描述</div>
               )}
 
-              {dueLabel ? (
+              {dueLabel || (card.commentCount || 0) > 0 ? (
                 <div className="card-footer">
-                  <span className={`due-badge due-badge--${dueStatus}`}>{dueLabel}</span>
+                  {dueLabel ? (
+                    <span className={`due-badge due-badge--${dueStatus}`}>{dueLabel}</span>
+                  ) : null}
+                  {(card.commentCount || 0) > 0 ? (
+                    <button
+                      type="button"
+                      className="card-comments-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenCard(lane.id, card.id);
+                      }}
+                    >
+                      查看评论
+                      {card.commentCount > 1 ? ` · ${card.commentCount}` : ''}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
 

@@ -20,6 +20,8 @@ ENV HOST=0.0.0.0
 ENV PORT=5000
 # Hugging Face / 无持久盘时用容器内目录
 ENV DATA_DIR=/data
+# 生产请通过编排系统覆盖：-e JWT_SECRET=...
+ENV JWT_SECRET=change-me-in-production
 
 RUN mkdir -p /data
 

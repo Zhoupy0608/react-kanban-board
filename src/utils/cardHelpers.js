@@ -44,5 +44,6 @@ export function normalizeCard(card = {}) {
     description: card.description ?? '',
     tags: Array.isArray(card.tags) ? card.tags : [],
     dueDate: card.dueDate || '',
+    commentCount: Math.max(0, Number(card.commentCount) || 0),
   };
 }

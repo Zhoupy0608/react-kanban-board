@@ -1,13 +1,15 @@
-import express from 'express';
-import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
 import { fileURLToPath } from 'url';
-import { openDb, getBoard, saveBoard } from './db.js';
+import express from 'express';
+import { WebSocketServer } from 'ws';
+import { createApp } from './server/createApp.js';
+import { assertAuthConfig, authenticateWsCredential } from './server/auth.js';
+import { getBoardAccess } from './server/collab.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** 固定端口：应用始终通过这一地址访问 */
 const PORT = Number(process.env.PORT) || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 const APP_LINK = `http://localhost:${PORT}`;
@@ -16,35 +18,8 @@ const isProd =
   process.env.NODE_ENV === 'production' || process.argv.includes('--prod');
 
 async function start() {
-  const app = express();
-  const db = openDb();
-
-  app.use(cors());
-  app.use(express.json());
-
-  app.get('/api/board', (req, res) => {
-    try {
-      res.json(getBoard(db));
-    } catch (err) {
-      console.error('读取看板失败:', err);
-      res.status(500).json({ success: false, message: '读取看板失败' });
-    }
-  });
-
-  app.post('/api/update-board', (req, res) => {
-    try {
-      const newList = req.body;
-      if (!Array.isArray(newList)) {
-        return res.status(400).json({ success: false, message: '请求体必须是看板数组' });
-      }
-      saveBoard(db, newList);
-      console.log('看板状态已写入 SQLite');
-      res.json({ success: true, message: '服务器已同步到数据库' });
-    } catch (err) {
-      console.error('写入看板失败:', err);
-      res.status(500).json({ success: false, message: '写入看板失败' });
-    }
-  });
+  assertAuthConfig();
+  const { app, db, realtime } = createApp();
 
   if (isProd && fs.existsSync(distDir)) {
     app.use(express.static(distDir));
@@ -53,7 +28,6 @@ async function start() {
       res.sendFile(path.join(distDir, 'index.html'));
     });
   } else {
-    // 开发：Vite 挂到同一端口，HMR + API 共用固定链接
     const { createServer } = await import('vite');
     const vite = await createServer({
       root: __dirname,
@@ -66,7 +40,48 @@ async function start() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, HOST, () => {
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server, path: '/ws' });
+
+  wss.on('connection', (ws, req) => {
+    try {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      // 优先使用短时 ticket；兼容旧客户端的 token 参数
+      const credential = url.searchParams.get('ticket') || url.searchParams.get('token');
+      const boardId = url.searchParams.get('boardId');
+      if (!credential) {
+        ws.close(4401, 'unauthorized');
+        return;
+      }
+      const user = authenticateWsCredential(db, credential);
+      realtime.joinUser(user.id, ws);
+
+      if (boardId) {
+        const access = getBoardAccess(db, boardId, user.id);
+        if (!access) {
+          ws.close(4403, 'forbidden');
+          return;
+        }
+        realtime.joinBoard(boardId, ws);
+      }
+
+      ws.send(
+        JSON.stringify({
+          type: 'connected',
+          userId: user.id,
+          boardId: boardId || null,
+          at: new Date().toISOString(),
+        })
+      );
+
+      ws.on('close', () => realtime.leave(ws));
+      ws.on('error', () => realtime.leave(ws));
+    } catch {
+      ws.close(4401, 'unauthorized');
+    }
+  });
+
+  server.listen(PORT, HOST, () => {
     const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || APP_LINK;
     console.log('');
     console.log('========================================');
@@ -76,6 +91,9 @@ async function start() {
     console.log(
       `模式: ${isProd && fs.existsSync(distDir) ? '生产 (dist)' : '开发 (Vite HMR)'}`
     );
+    console.log('WebSocket: /ws?ticket=...&boardId=...（先 POST /api/auth/ws-ticket）');
+    console.log('演示账号: demo@mykanban.dev / demo1234');
+    console.log('协作账号: collab@mykanban.dev / demo1234');
     console.log('');
   });
 }
