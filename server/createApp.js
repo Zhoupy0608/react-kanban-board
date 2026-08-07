@@ -7,6 +7,8 @@ import { buildCorsOptions } from './cors.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createBoardsRouter } from './routes/boards.js';
 import { createNotificationsRouter } from './routes/notifications.js';
+import { createAiRouter } from './routes/ai.js';
+import { isAiConfigured } from './ai.js';
 import { getSchemaVersion } from './migrations/index.js';
 
 /**
@@ -23,18 +25,22 @@ export function createApp(options = {}) {
   app.use(express.json({ limit: '2mb' }));
 
   app.get('/api/health', (_req, res) => {
+    const features = ['auth', 'boards', 'members', 'comments', 'notifications', 'websocket'];
+    if (isAiConfigured()) features.push('ai');
     res.json({
       success: true,
       status: 'ok',
       time: new Date().toISOString(),
       schemaVersion: getSchemaVersion(db),
-      features: ['auth', 'boards', 'members', 'comments', 'notifications', 'websocket'],
+      features,
+      aiEnabled: isAiConfigured(),
     });
   });
 
   app.use('/api/auth', createAuthRouter(db));
   app.use('/api/boards', createBoardsRouter(db, realtime));
   app.use('/api/notifications', createNotificationsRouter(db));
+  app.use('/api/ai', createAiRouter(db));
 
   app.use((err, _req, res, _next) => {
     if (err?.message?.startsWith('CORS blocked')) {

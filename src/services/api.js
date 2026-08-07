@@ -187,6 +187,55 @@ export const notificationsService = {
   remove: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
 };
 
+export const aiService = {
+  status: async () => {
+    const data = await request('/ai/status');
+    return data;
+  },
+  polish: async ({ boardId, title, description }) => {
+    const data = await request('/ai/card-polish', {
+      method: 'POST',
+      body: JSON.stringify({ boardId, title, description }),
+    });
+    return data;
+  },
+  describe: async ({ boardId, title }) => {
+    const data = await request('/ai/card-describe', {
+      method: 'POST',
+      body: JSON.stringify({ boardId, title }),
+    });
+    return data;
+  },
+  split: async ({ boardId, title, description }) => {
+    const data = await request('/ai/card-split', {
+      method: 'POST',
+      body: JSON.stringify({ boardId, title, description }),
+    });
+    return data;
+  },
+  checklist: async ({ boardId, title, description }) => {
+    const data = await request('/ai/card-checklist', {
+      method: 'POST',
+      body: JSON.stringify({ boardId, title, description }),
+    });
+    return data;
+  },
+  suggestPriority: async ({ boardId, title, description }) => {
+    const data = await request('/ai/card-priority', {
+      method: 'POST',
+      body: JSON.stringify({ boardId, title, description }),
+    });
+    return data;
+  },
+  laneInject: async ({ boardId, laneTitle, prompt, existingTitles }) => {
+    const data = await request('/ai/lane-inject', {
+      method: 'POST',
+      body: JSON.stringify({ boardId, laneTitle, prompt, existingTitles }),
+    });
+    return data;
+  },
+};
+
 /** 先换短时 ticket，再拼 WebSocket URL（避免长期 JWT 出现在 query） */
 export async function createWsUrl({ boardId } = {}) {
   if (!getToken()) return null;

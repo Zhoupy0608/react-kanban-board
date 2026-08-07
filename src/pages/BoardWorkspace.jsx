@@ -132,6 +132,7 @@ export default function BoardWorkspace() {
     renameLane,
     deleteLane,
     addCard,
+    addCards,
     deleteCard,
     updateCard,
     moveCard,
@@ -570,7 +571,16 @@ export default function BoardWorkspace() {
                     key={lane.id}
                     index={realIndex >= 0 ? realIndex : index}
                     lane={lane}
+                    boardId={boardId}
+                    readOnly={readOnly}
                     addCard={readOnly ? () => {} : openAddCard}
+                    onAddCards={
+                      readOnly
+                        ? undefined
+                        : (laneId, cards) => {
+                            addCards(laneId, cards);
+                          }
+                    }
                     onDragStart={readOnly ? () => {} : onDragStart}
                     onDragEnd={onDragEnd}
                     onDrop={readOnly ? () => {} : onDrop}
@@ -699,6 +709,9 @@ export default function BoardWorkspace() {
         onSave={(laneId, cardId, patch) => {
           updateCard(laneId, cardId, patch);
           closeDrawer();
+        }}
+        onAddCards={(laneId, cards) => {
+          addCards(laneId, cards);
         }}
         onDelete={requestDeleteCard}
         onMove={(fromLaneId, cardId, toLaneId) => {

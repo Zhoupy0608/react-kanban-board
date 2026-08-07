@@ -62,6 +62,7 @@ npm start
 - **WebSocket**：前端先 `POST /api/auth/ws-ticket` 换短时票据，再连 `/ws?ticket=...&boardId=...`
 - **评论与 @提及**：卡片抽屉内评论；`@昵称` 或 `@邮箱前缀` 会生成通知
 - **通知中心**：顶栏铃铛，支持已读与删除
+- **板内 AI**（可选）：卡片抽屉「润色描述 / 拆分任务」；需配置 `AI_API_KEY`（OpenAI 兼容），见 `.env.example`
 
 协作演示账号（需先用主账号邀请后可见分享看板）：`collab@mykanban.dev` / `demo1234`
 
@@ -118,7 +119,7 @@ users → boards → lanes → cards
                  ↘ activity_events / card_comments / notifications
 ```
 
-Schema 由 `server/migrations/` 版本化管理（当前 **v5**）：
+Schema 由 `server/migrations/` 版本化管理（当前 **v7**）：
 
 | 版本 | 内容 |
 | --- | --- |
@@ -127,6 +128,8 @@ Schema 由 `server/migrations/` 版本化管理（当前 **v5**）：
 | v3 | 成员 / 评论 / 通知 |
 | v4 | `users.token_version`（登出作废 JWT） |
 | v5 | `boards.content_version`（整板同步乐观锁） |
+| v6 | `cards.checklist`（卡片内勾选清单） |
+| v7 | `cards.priority`（低 / 中 / 高） |
 
 启动时自动 `migrate up`；也可用 `npm run migrate` / `migrate:up` / `migrate:down`。升级路径保留数据，不再「版本不够就整库重建」。
 

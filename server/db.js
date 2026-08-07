@@ -46,6 +46,45 @@ export function normalizeDueDate(value) {
   return d.toISOString().slice(0, 10);
 }
 
+const PRIORITY_VALUES = new Set(['low', 'normal', 'high']);
+
+/** @returns {'low'|'normal'|'high'} */
+export function normalizePriority(value) {
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (PRIORITY_VALUES.has(raw)) return raw;
+  if (/^(高|紧急|urgent|p0|p1)$/i.test(raw)) return 'high';
+  if (/^(低|low|p3)$/i.test(raw)) return 'low';
+  if (/^(中|一般|medium|中等|p2)$/i.test(raw)) return 'normal';
+  return 'normal';
+}
+
+/** @returns {{ id: string, text: string, done: boolean }[]} */
+export function normalizeChecklist(value) {
+  let list = value;
+  if (typeof value === 'string') {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item, i) => {
+      const text = String(item?.text ?? item?.title ?? '').trim();
+      if (!text) return null;
+      return {
+        id: String(item?.id || `chk-${i}-${text.slice(0, 12)}`),
+        text,
+        done: Boolean(item?.done),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 40);
+}
+
 function sampleLanes() {
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -379,7 +418,7 @@ export function getBoardFull(db, boardId) {
     .all(boardId);
 
   const cardsStmt = db.prepare(
-    `SELECT id, text, description, tags, due_date FROM cards WHERE lane_id = ? ORDER BY position ASC`
+    `SELECT id, text, description, tags, due_date, checklist, priority FROM cards WHERE lane_id = ? ORDER BY position ASC`
   );
 
   const commentCounts = db
@@ -405,6 +444,8 @@ export function getBoardFull(db, boardId) {
         description: card.description ?? '',
         tags: normalizeTags(card.tags),
         dueDate: normalizeDueDate(card.due_date),
+        checklist: normalizeChecklist(card.checklist),
+        priority: normalizePriority(card.priority),
         commentCount: countByCard[card.id] || 0,
       })),
     })),
@@ -439,8 +480,8 @@ export function saveBoardFull(db, boardId, lanes, options = {}) {
     `INSERT INTO lanes (id, board_id, title, position) VALUES (?, ?, ?, ?)`
   );
   const insertCard = db.prepare(
-    `INSERT INTO cards (id, lane_id, text, description, tags, due_date, position)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO cards (id, lane_id, text, description, tags, due_date, checklist, priority, position)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const replace = db.transaction((laneList) => {
@@ -466,6 +507,8 @@ export function saveBoardFull(db, boardId, lanes, options = {}) {
           card.description ?? '',
           JSON.stringify(normalizeTags(card.tags)),
           normalizeDueDate(card.dueDate),
+          JSON.stringify(normalizeChecklist(card.checklist)),
+          normalizePriority(card.priority),
           cardIndex
         );
       });

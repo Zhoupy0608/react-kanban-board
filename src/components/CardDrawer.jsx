@@ -1,8 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatDueLabel, getDueStatus, normalizeTags } from '../utils/cardHelpers';
+import {
+  formatDueLabel,
+  getDueStatus,
+  normalizeChecklist,
+  normalizePriority,
+  normalizeTags,
+  PRIORITY_OPTIONS,
+  priorityLabel,
+} from '../utils/cardHelpers';
 import { styles } from '../styles/kanbanStyles';
-import { ApiError, boardsService } from '../services/api';
+import { ApiError, aiService, boardsService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+
+function newChecklistItem(text = '') {
+  return {
+    id: `chk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    text,
+    done: false,
+  };
+}
 
 export function CardDrawer({
   open,
@@ -14,6 +30,7 @@ export function CardDrawer({
   onSave,
   onDelete,
   onMove,
+  onAddCards,
   readOnly = false,
   commentSignal = 0,
   onCommentCountChange,
@@ -23,11 +40,22 @@ export function CardDrawer({
   const [description, setDescription] = useState('');
   const [tagsText, setTagsText] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [priority, setPriority] = useState('normal');
+  const [checklist, setChecklist] = useState([]);
+  const [newItemText, setNewItemText] = useState('');
+  const [priorityHint, setPriorityHint] = useState('');
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState('');
   const [commentError, setCommentError] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  const [aiBusy, setAiBusy] = useState(null);
+  const [aiError, setAiError] = useState('');
+  const [descPreview, setDescPreview] = useState(null);
+  const [descPreviewKind, setDescPreviewKind] = useState(null);
+  const [splitPreview, setSplitPreview] = useState(null);
+  const [checklistPreview, setChecklistPreview] = useState(null);
 
   useEffect(() => {
     if (!open || !card) return;
@@ -35,6 +63,16 @@ export function CardDrawer({
     setDescription(card.description || '');
     setTagsText((card.tags || []).join(', '));
     setDueDate(card.dueDate || '');
+    setPriority(normalizePriority(card.priority));
+    setChecklist(normalizeChecklist(card.checklist));
+    setNewItemText('');
+    setPriorityHint('');
+    setAiError('');
+    setAiBusy(null);
+    setDescPreview(null);
+    setDescPreviewKind(null);
+    setSplitPreview(null);
+    setChecklistPreview(null);
   }, [open, card]);
 
   useEffect(() => {
@@ -64,6 +102,7 @@ export function CardDrawer({
 
   const dueStatus = useMemo(() => getDueStatus(dueDate), [dueDate]);
   const dueHint = formatDueLabel(dueDate);
+  const checklistDone = checklist.filter((i) => i.done).length;
 
   if (!open || !card || !lane) return null;
 
@@ -76,7 +115,200 @@ export function CardDrawer({
       description,
       tags: normalizeTags(tagsText),
       dueDate,
+      priority: normalizePriority(priority),
+      checklist: normalizeChecklist(checklist),
     });
+  };
+
+  const addChecklistItem = (e) => {
+    e?.preventDefault?.();
+    const t = newItemText.trim();
+    if (!t || readOnly) return;
+    setChecklist((prev) => [...prev, newChecklistItem(t)].slice(0, 40));
+    setNewItemText('');
+  };
+
+  const runPolish = async () => {
+    if (readOnly || aiBusy) return;
+    const title = text.trim();
+    if (!title) {
+      setAiError('请先填写卡片标题');
+      return;
+    }
+    setAiError('');
+    setSplitPreview(null);
+    setChecklistPreview(null);
+    setAiBusy('polish');
+    try {
+      const data = await aiService.polish({ boardId, title, description });
+      setDescPreview(String(data.description || ''));
+      setDescPreviewKind('polish');
+    } catch (err) {
+      setAiError(err instanceof ApiError ? err.message : '润色失败');
+      setDescPreview(null);
+      setDescPreviewKind(null);
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const runDescribe = async () => {
+    if (readOnly || aiBusy) return;
+    const title = text.trim();
+    if (!title) {
+      setAiError('请先填写卡片标题');
+      return;
+    }
+    setAiError('');
+    setSplitPreview(null);
+    setChecklistPreview(null);
+    setAiBusy('describe');
+    try {
+      const data = await aiService.describe({ boardId, title });
+      setDescPreview(String(data.description || ''));
+      setDescPreviewKind('describe');
+    } catch (err) {
+      setAiError(err instanceof ApiError ? err.message : '生成描述失败');
+      setDescPreview(null);
+      setDescPreviewKind(null);
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const applyDescPreview = () => {
+    if (!descPreview) return;
+    setDescription(descPreview);
+    setDescPreview(null);
+    setDescPreviewKind(null);
+  };
+
+  const runSplit = async () => {
+    if (readOnly || aiBusy) return;
+    const title = text.trim();
+    if (!title) {
+      setAiError('请先填写卡片标题');
+      return;
+    }
+    setAiError('');
+    setDescPreview(null);
+    setDescPreviewKind(null);
+    setChecklistPreview(null);
+    setAiBusy('split');
+    try {
+      const data = await aiService.split({ boardId, title, description });
+      const cards = (data.cards || []).map((c, i) => ({
+        key: `${i}-${c.title}`,
+        title: c.title,
+        description: c.description || '',
+        selected: true,
+      }));
+      setSplitPreview(cards);
+    } catch (err) {
+      setAiError(err instanceof ApiError ? err.message : '拆分失败');
+      setSplitPreview(null);
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const runChecklistSplit = async () => {
+    if (readOnly || aiBusy) return;
+    const title = text.trim();
+    if (!title) {
+      setAiError('请先填写卡片标题');
+      return;
+    }
+    setAiError('');
+    setDescPreview(null);
+    setDescPreviewKind(null);
+    setSplitPreview(null);
+    setAiBusy('checklist');
+    try {
+      const data = await aiService.checklist({ boardId, title, description });
+      const items = (data.items || []).map((item, i) => ({
+        key: `${i}-${item.text}`,
+        text: item.text,
+        selected: true,
+      }));
+      setChecklistPreview(items);
+    } catch (err) {
+      setAiError(err instanceof ApiError ? err.message : '拆清单失败');
+      setChecklistPreview(null);
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const runSuggestPriority = async () => {
+    if (readOnly || aiBusy) return;
+    const title = text.trim();
+    if (!title) {
+      setAiError('请先填写卡片标题');
+      return;
+    }
+    setAiError('');
+    setPriorityHint('');
+    setAiBusy('priority');
+    try {
+      const data = await aiService.suggestPriority({ boardId, title, description });
+      const next = normalizePriority(data.priority);
+      setPriority(next);
+      setPriorityHint(
+        data.reason
+          ? `建议：${priorityLabel(next)} — ${data.reason}`
+          : `建议：${priorityLabel(next)}`
+      );
+    } catch (err) {
+      setAiError(err instanceof ApiError ? err.message : '优先级建议失败');
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
+  const toggleSplitCard = (key) => {
+    setSplitPreview((prev) =>
+      (prev || []).map((c) => (c.key === key ? { ...c, selected: !c.selected } : c))
+    );
+  };
+
+  const toggleChecklistPreview = (key) => {
+    setChecklistPreview((prev) =>
+      (prev || []).map((c) => (c.key === key ? { ...c, selected: !c.selected } : c))
+    );
+  };
+
+  const applySplit = () => {
+    if (!splitPreview || !onAddCards) return;
+    const selected = splitPreview.filter((c) => c.selected);
+    if (!selected.length) {
+      setAiError('请至少勾选一张子任务');
+      return;
+    }
+    onAddCards(
+      lane.id,
+      selected.map((c) => ({
+        title: c.title,
+        description: c.description,
+      }))
+    );
+    setSplitPreview(null);
+  };
+
+  const applyChecklistPreview = () => {
+    if (!checklistPreview) return;
+    const selected = checklistPreview.filter((c) => c.selected);
+    if (!selected.length) {
+      setAiError('请至少勾选一条清单');
+      return;
+    }
+    setChecklist((prev) =>
+      normalizeChecklist([
+        ...prev,
+        ...selected.map((c) => newChecklistItem(c.text)),
+      ])
+    );
+    setChecklistPreview(null);
   };
 
   const submitComment = async (e) => {
@@ -84,7 +316,6 @@ export function CardDrawer({
     setCommentError('');
     setCommentLoading(true);
     try {
-      // 发送前核对身份，避免其他标签页切换账号后仍用旧界面身份
       await refreshUser();
       const created = await boardsService.addComment(boardId, card.id, commentBody);
       setComments((prev) => {
@@ -156,6 +387,263 @@ export function CardDrawer({
             disabled={readOnly}
             onChange={(e) => setDescription(e.target.value)}
           />
+
+          {!readOnly ? (
+            <div className="ai-assist">
+              <div className="ai-assist-actions">
+                <button
+                  type="button"
+                  className="ai-assist-btn"
+                  disabled={Boolean(aiBusy)}
+                  onClick={runDescribe}
+                >
+                  {aiBusy === 'describe' ? '生成中…' : 'AI 生成描述'}
+                </button>
+                <button
+                  type="button"
+                  className="ai-assist-btn"
+                  disabled={Boolean(aiBusy)}
+                  onClick={runPolish}
+                >
+                  {aiBusy === 'polish' ? '润色中…' : 'AI 润色描述'}
+                </button>
+                <button
+                  type="button"
+                  className="ai-assist-btn"
+                  disabled={Boolean(aiBusy)}
+                  onClick={runSuggestPriority}
+                >
+                  {aiBusy === 'priority' ? '分析中…' : 'AI 建议优先级'}
+                </button>
+                <button
+                  type="button"
+                  className="ai-assist-btn"
+                  disabled={Boolean(aiBusy)}
+                  onClick={runChecklistSplit}
+                >
+                  {aiBusy === 'checklist' ? '拆分中…' : 'AI 拆到清单'}
+                </button>
+                <button
+                  type="button"
+                  className="ai-assist-btn"
+                  disabled={Boolean(aiBusy) || !onAddCards}
+                  onClick={runSplit}
+                >
+                  {aiBusy === 'split' ? '拆分中…' : 'AI 拆成卡片'}
+                </button>
+              </div>
+              <p className="ai-assist-hint">
+                「拆到清单」写在本卡内；「拆成卡片」在同列新建多张卡。均先预览再写入。
+              </p>
+              {aiError ? <div className="auth-error">{aiError}</div> : null}
+
+              {descPreview != null ? (
+                <div className="ai-preview">
+                  <div className="ai-preview-head">
+                    <strong>
+                      {descPreviewKind === 'describe' ? '生成预览' : '润色预览'}
+                    </strong>
+                    <div className="ai-preview-actions">
+                      <button
+                        type="button"
+                        className="ai-preview-ghost"
+                        onClick={() => {
+                          setDescPreview(null);
+                          setDescPreviewKind(null);
+                        }}
+                      >
+                        丢弃
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-preview-apply"
+                        onClick={applyDescPreview}
+                      >
+                        应用到描述
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="ai-preview-body">{descPreview}</pre>
+                </div>
+              ) : null}
+
+              {checklistPreview ? (
+                <div className="ai-preview">
+                  <div className="ai-preview-head">
+                    <strong>清单预览</strong>
+                    <div className="ai-preview-actions">
+                      <button
+                        type="button"
+                        className="ai-preview-ghost"
+                        onClick={() => setChecklistPreview(null)}
+                      >
+                        丢弃
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-preview-apply"
+                        onClick={applyChecklistPreview}
+                      >
+                        追加到清单
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="ai-split-list">
+                    {checklistPreview.map((c) => (
+                      <li key={c.key}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={c.selected}
+                            onChange={() => toggleChecklistPreview(c.key)}
+                          />
+                          <span>
+                            <strong>{c.text}</strong>
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {splitPreview ? (
+                <div className="ai-preview">
+                  <div className="ai-preview-head">
+                    <strong>拆分预览</strong>
+                    <div className="ai-preview-actions">
+                      <button
+                        type="button"
+                        className="ai-preview-ghost"
+                        onClick={() => setSplitPreview(null)}
+                      >
+                        丢弃
+                      </button>
+                      <button type="button" className="ai-preview-apply" onClick={applySplit}>
+                        创建勾选卡片
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="ai-split-list">
+                    {splitPreview.map((c) => (
+                      <li key={c.key}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={c.selected}
+                            onChange={() => toggleSplitCard(c.key)}
+                          />
+                          <span>
+                            <strong>{c.title}</strong>
+                            {c.description ? <em>{c.description}</em> : null}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="checklist-block">
+            <div className="checklist-head">
+              <label style={{ ...styles.modalLabel, marginBottom: 0 }}>清单</label>
+              {checklist.length > 0 ? (
+                <span className="checklist-progress">
+                  {checklistDone}/{checklist.length}
+                </span>
+              ) : null}
+            </div>
+            <ul className="checklist-list">
+              {checklist.length === 0 ? (
+                <li className="checklist-empty">暂无清单项</li>
+              ) : (
+                checklist.map((item) => (
+                  <li key={item.id} className={item.done ? 'is-done' : undefined}>
+                    <label className="checklist-item">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        disabled={readOnly}
+                        onChange={() =>
+                          setChecklist((prev) =>
+                            prev.map((x) =>
+                              x.id === item.id ? { ...x, done: !x.done } : x
+                            )
+                          )
+                        }
+                      />
+                      {readOnly ? (
+                        <span>{item.text}</span>
+                      ) : (
+                        <input
+                          className="checklist-text"
+                          value={item.text}
+                          onChange={(e) =>
+                            setChecklist((prev) =>
+                              prev.map((x) =>
+                                x.id === item.id ? { ...x, text: e.target.value } : x
+                              )
+                            )
+                          }
+                        />
+                      )}
+                    </label>
+                    {!readOnly ? (
+                      <button
+                        type="button"
+                        className="checklist-remove"
+                        aria-label="删除清单项"
+                        onClick={() =>
+                          setChecklist((prev) => prev.filter((x) => x.id !== item.id))
+                        }
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </li>
+                ))
+              )}
+            </ul>
+            {!readOnly ? (
+              <form className="checklist-add" onSubmit={addChecklistItem}>
+                <input
+                  value={newItemText}
+                  onChange={(e) => setNewItemText(e.target.value)}
+                  placeholder="添加清单项…"
+                  maxLength={120}
+                />
+                <button type="submit" disabled={!newItemText.trim()}>
+                  添加
+                </button>
+              </form>
+            ) : null}
+          </div>
+
+          <label style={styles.modalLabel}>优先级</label>
+          <div className="priority-row">
+            <select
+              className="drawer-select"
+              style={{ marginBottom: 0, flex: 1 }}
+              value={priority}
+              disabled={readOnly}
+              onChange={(e) => {
+                setPriority(normalizePriority(e.target.value));
+                setPriorityHint('');
+              }}
+            >
+              {PRIORITY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <span className={`priority-chip priority-chip--${priority}`}>
+              {priorityLabel(priority)}
+            </span>
+          </div>
+          {priorityHint ? <p className="priority-hint">{priorityHint}</p> : null}
 
           <label style={styles.modalLabel}>标签（逗号分隔）</label>
           <input

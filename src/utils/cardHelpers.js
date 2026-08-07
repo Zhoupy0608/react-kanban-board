@@ -37,6 +37,55 @@ export function normalizeTags(tags) {
   )];
 }
 
+const PRIORITY_VALUES = new Set(['low', 'normal', 'high']);
+
+/** @returns {'low'|'normal'|'high'} */
+export function normalizePriority(value) {
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (PRIORITY_VALUES.has(raw)) return raw;
+  if (/^(高|紧急|urgent|p0|p1)$/i.test(raw)) return 'high';
+  if (/^(低|low|p3)$/i.test(raw)) return 'low';
+  if (/^(中|一般|medium|中等|p2)$/i.test(raw)) return 'normal';
+  return 'normal';
+}
+
+export const PRIORITY_OPTIONS = [
+  { value: 'low', label: '低' },
+  { value: 'normal', label: '中' },
+  { value: 'high', label: '高' },
+];
+
+export function priorityLabel(value) {
+  const p = normalizePriority(value);
+  return PRIORITY_OPTIONS.find((o) => o.value === p)?.label || '中';
+}
+
+/** @returns {{ id: string, text: string, done: boolean }[]} */
+export function normalizeChecklist(value) {
+  let list = value;
+  if (typeof value === 'string') {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item, i) => {
+      const text = String(item?.text ?? item?.title ?? '').trim();
+      if (!text) return null;
+      const id =
+        String(item?.id || '').trim() ||
+        `chk-${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 7)}`;
+      return { id, text, done: Boolean(item?.done) };
+    })
+    .filter(Boolean)
+    .slice(0, 40);
+}
+
 export function normalizeCard(card = {}) {
   return {
     ...card,
@@ -44,6 +93,8 @@ export function normalizeCard(card = {}) {
     description: card.description ?? '',
     tags: Array.isArray(card.tags) ? card.tags : [],
     dueDate: card.dueDate || '',
+    checklist: normalizeChecklist(card.checklist),
+    priority: normalizePriority(card.priority),
     commentCount: Math.max(0, Number(card.commentCount) || 0),
   };
 }

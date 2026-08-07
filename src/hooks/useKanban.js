@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ApiError, boardsService, getToken } from '../services/api';
-import { normalizeCard, normalizeTags } from '../utils/cardHelpers';
+import { normalizeCard, normalizeChecklist, normalizePriority, normalizeTags } from '../utils/cardHelpers';
 
 const UNDO_LIMIT = 30;
 const SYNC_DEBOUNCE_MS = 280;
@@ -290,7 +290,7 @@ export function useKanban(boardId) {
   );
 
   const addCard = useCallback(
-    (laneId, text, tags = [], dueDate = '') => {
+    (laneId, text, tags = [], dueDate = '', description = '') => {
       const trimmed = (text || '').trim();
       if (!trimmed) return;
 
@@ -302,14 +302,42 @@ export function useKanban(boardId) {
                 cards: [
                   ...lane.cards,
                   normalizeCard({
-                    id: Date.now().toString(),
+                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                     text: trimmed,
-                    description: '',
+                    description: String(description || ''),
                     tags: normalizeTags(tags),
                     dueDate: dueDate || '',
                   }),
                 ],
               }
+            : lane
+        )
+      );
+    },
+    [commitBoard]
+  );
+
+  const addCards = useCallback(
+    (laneId, cards = []) => {
+      const prepared = (cards || [])
+        .map((c, i) => {
+          const text = String(c?.text || c?.title || '').trim();
+          if (!text) return null;
+          return normalizeCard({
+            id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+            text,
+            description: String(c?.description || ''),
+            tags: normalizeTags(c?.tags || []),
+            dueDate: c?.dueDate || '',
+          });
+        })
+        .filter(Boolean);
+      if (!prepared.length) return;
+
+      commitBoard((prev) =>
+        prev.map((lane) =>
+          lane.id === laneId
+            ? { ...lane, cards: [...lane.cards, ...prepared] }
             : lane
         )
       );
@@ -406,6 +434,8 @@ export function useKanban(boardId) {
     (laneId, cardId, patch) => {
       const next = { ...patch };
       if (next.tags !== undefined) next.tags = normalizeTags(next.tags);
+      if (next.checklist !== undefined) next.checklist = normalizeChecklist(next.checklist);
+      if (next.priority !== undefined) next.priority = normalizePriority(next.priority);
       if (next.text !== undefined) {
         next.text = String(next.text || '').trim();
         if (!next.text) return;
@@ -529,6 +559,7 @@ export function useKanban(boardId) {
     setCardCommentCount,
     draggedCard,
     addCard,
+    addCards,
     addLane,
     renameLane,
     deleteLane,
