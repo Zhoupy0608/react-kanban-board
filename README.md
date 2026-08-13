@@ -70,6 +70,10 @@ npm start
 
 ## 界面预览
 
+**图 1 · 登录** — 演示账号预填，支持双窗口独立登录态
+
+![登录](docs/screenshots/login.png)
+
 **图 2 · 看板列表** — 正式看板与草稿箱，支持添加、发布与删除
 
 ![看板列表](docs/screenshots/boards.png)
@@ -78,9 +82,17 @@ npm start
 
 ![看板视图](docs/screenshots/board.png)
 
-**图 4 · 列表视图** — 表格化浏览任务、标签与截止日期
+**图 4 · 概览** — 任务统计、列分布与标签分布
+
+![概览视图](docs/screenshots/overview.png)
+
+**图 5 · 列表视图** — 表格化浏览任务、标签与截止日期
 
 ![列表视图](docs/screenshots/list.png)
+
+**图 6 · 日历视图** — 按日期排期，未排期任务可拖入日历
+
+![日历视图](docs/screenshots/calendar.png)
 
 ---
 
@@ -178,8 +190,6 @@ Schema 由 `server/migrations/` 管理（当前 **v8**）：
 
 - **Render**：见 `render.yaml`，控制台设置 `JWT_SECRET`
 - **Docker**：见 `Dockerfile`，传入 `JWT_SECRET`、`DATA_DIR`
-
-更多截图（概览 / 日历）见 [`docs/screenshots/`](docs/screenshots/)。
 
 ---
 
