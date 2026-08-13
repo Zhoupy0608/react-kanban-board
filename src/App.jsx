@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { BoardListPage } from './pages/BoardListPage';
+import { ProfilePage } from './pages/ProfilePage';
 import BoardWorkspace from './pages/BoardWorkspace';
 
 export default function App() {
@@ -18,6 +19,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <BoardListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
               </ProtectedRoute>
             }
           />

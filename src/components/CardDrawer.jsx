@@ -3,10 +3,7 @@ import {
   formatDueLabel,
   getDueStatus,
   normalizeChecklist,
-  normalizePriority,
   normalizeTags,
-  PRIORITY_OPTIONS,
-  priorityLabel,
 } from '../utils/cardHelpers';
 import { styles } from '../styles/kanbanStyles';
 import { ApiError, aiService, boardsService } from '../services/api';
@@ -40,10 +37,8 @@ export function CardDrawer({
   const [description, setDescription] = useState('');
   const [tagsText, setTagsText] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [priority, setPriority] = useState('normal');
   const [checklist, setChecklist] = useState([]);
   const [newItemText, setNewItemText] = useState('');
-  const [priorityHint, setPriorityHint] = useState('');
   const [comments, setComments] = useState([]);
   const [commentBody, setCommentBody] = useState('');
   const [commentError, setCommentError] = useState('');
@@ -63,10 +58,8 @@ export function CardDrawer({
     setDescription(card.description || '');
     setTagsText((card.tags || []).join(', '));
     setDueDate(card.dueDate || '');
-    setPriority(normalizePriority(card.priority));
     setChecklist(normalizeChecklist(card.checklist));
     setNewItemText('');
-    setPriorityHint('');
     setAiError('');
     setAiBusy(null);
     setDescPreview(null);
@@ -115,7 +108,6 @@ export function CardDrawer({
       description,
       tags: normalizeTags(tagsText),
       dueDate,
-      priority: normalizePriority(priority),
       checklist: normalizeChecklist(checklist),
     });
   };
@@ -235,32 +227,6 @@ export function CardDrawer({
     } catch (err) {
       setAiError(err instanceof ApiError ? err.message : '拆清单失败');
       setChecklistPreview(null);
-    } finally {
-      setAiBusy(null);
-    }
-  };
-
-  const runSuggestPriority = async () => {
-    if (readOnly || aiBusy) return;
-    const title = text.trim();
-    if (!title) {
-      setAiError('请先填写卡片标题');
-      return;
-    }
-    setAiError('');
-    setPriorityHint('');
-    setAiBusy('priority');
-    try {
-      const data = await aiService.suggestPriority({ boardId, title, description });
-      const next = normalizePriority(data.priority);
-      setPriority(next);
-      setPriorityHint(
-        data.reason
-          ? `建议：${priorityLabel(next)} — ${data.reason}`
-          : `建议：${priorityLabel(next)}`
-      );
-    } catch (err) {
-      setAiError(err instanceof ApiError ? err.message : '优先级建议失败');
     } finally {
       setAiBusy(null);
     }
@@ -406,14 +372,6 @@ export function CardDrawer({
                   onClick={runPolish}
                 >
                   {aiBusy === 'polish' ? '润色中…' : 'AI 润色描述'}
-                </button>
-                <button
-                  type="button"
-                  className="ai-assist-btn"
-                  disabled={Boolean(aiBusy)}
-                  onClick={runSuggestPriority}
-                >
-                  {aiBusy === 'priority' ? '分析中…' : 'AI 建议优先级'}
                 </button>
                 <button
                   type="button"
@@ -620,30 +578,6 @@ export function CardDrawer({
               </form>
             ) : null}
           </div>
-
-          <label style={styles.modalLabel}>优先级</label>
-          <div className="priority-row">
-            <select
-              className="drawer-select"
-              style={{ marginBottom: 0, flex: 1 }}
-              value={priority}
-              disabled={readOnly}
-              onChange={(e) => {
-                setPriority(normalizePriority(e.target.value));
-                setPriorityHint('');
-              }}
-            >
-              {PRIORITY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <span className={`priority-chip priority-chip--${priority}`}>
-              {priorityLabel(priority)}
-            </span>
-          </div>
-          {priorityHint ? <p className="priority-hint">{priorityHint}</p> : null}
 
           <label style={styles.modalLabel}>标签（逗号分隔）</label>
           <input

@@ -5,9 +5,10 @@ import * as m004 from './004_token_version.js';
 import * as m005 from './005_content_version.js';
 import * as m006 from './006_card_checklist.js';
 import * as m007 from './007_card_priority.js';
+import * as m008 from './008_board_drafts.js';
 
 /** 按 version 升序；version 必须连续且与 schema_meta.version 对齐 */
-export const migrations = [m001, m002, m003, m004, m005, m006, m007];
+export const migrations = [m001, m002, m003, m004, m005, m006, m007, m008];
 
 export const LATEST_SCHEMA_VERSION = migrations[migrations.length - 1].version;
 

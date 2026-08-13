@@ -81,6 +81,44 @@ describe('auth API', () => {
     expect(res.status).toBe(401);
   });
 
+  it('updates profile name and email', async () => {
+    const login = await request(app).post('/api/auth/login').send({
+      email: 'alice@example.com',
+      password: 'secret12',
+    });
+    const res = await request(app)
+      .patch('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.token}`)
+      .send({ name: 'Alice Updated', email: 'alice.updated@example.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.user.name).toBe('Alice Updated');
+    expect(res.body.user.email).toBe('alice.updated@example.com');
+    expect(res.body.token).toBeTruthy();
+
+    const me = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${res.body.token}`);
+    expect(me.status).toBe(200);
+    expect(me.body.user.email).toBe('alice.updated@example.com');
+  });
+
+  it('rejects profile email taken by another user', async () => {
+    await request(app).post('/api/auth/register').send({
+      email: 'bob@example.com',
+      name: 'Bob',
+      password: 'secret12',
+    });
+    const login = await request(app).post('/api/auth/login').send({
+      email: 'alice.updated@example.com',
+      password: 'secret12',
+    });
+    const res = await request(app)
+      .patch('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.token}`)
+      .send({ name: 'Alice', email: 'bob@example.com' });
+    expect(res.status).toBe(409);
+  });
+
   it('demo account is seeded', async () => {
     const res = await request(app).post('/api/auth/login').send({
       email: 'demo@mykanban.dev',

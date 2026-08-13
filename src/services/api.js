@@ -97,6 +97,11 @@ export const authService = {
       body: JSON.stringify(payload),
     }),
   me: () => request('/auth/me'),
+  updateProfile: (payload) =>
+    request('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   wsTicket: async () => {
     const data = await request('/auth/ws-ticket', { method: 'POST' });
@@ -172,6 +177,32 @@ export const boardsService = {
   },
   deleteComment: (boardId, commentId) =>
     request(`/boards/${boardId}/comments/${commentId}`, { method: 'DELETE' }),
+};
+
+export const draftsService = {
+  list: async () => {
+    const data = await request('/drafts');
+    return data.drafts || [];
+  },
+  create: async (payload) => {
+    const data = await request('/drafts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return data.draft;
+  },
+  update: async (id, payload) => {
+    const data = await request(`/drafts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return data.draft;
+  },
+  remove: (id) => request(`/drafts/${id}`, { method: 'DELETE' }),
+  publish: async (id) => {
+    const data = await request(`/drafts/${id}/publish`, { method: 'POST' });
+    return data.board;
+  },
 };
 
 export const notificationsService = {

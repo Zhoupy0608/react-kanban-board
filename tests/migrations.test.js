@@ -34,7 +34,7 @@ describe('schema migrations', () => {
     const result = migrateUp(db);
     expect(result.from).toBe(0);
     expect(result.to).toBe(LATEST_SCHEMA_VERSION);
-    expect(result.ran.map((r) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(result.ran.map((r) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
     const tables = db
       .prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)
@@ -51,6 +51,7 @@ describe('schema migrations', () => {
         'board_members',
         'card_comments',
         'notifications',
+        'board_drafts',
       ])
     );
     const cardCols = db.prepare(`PRAGMA table_info(cards)`).all().map((c) => c.name);
@@ -77,7 +78,7 @@ describe('schema migrations', () => {
     const result = migrateUp(db);
     expect(result.from).toBe(2);
     expect(result.to).toBe(LATEST_SCHEMA_VERSION);
-    expect(result.ran.map((r) => r.version)).toEqual([3, 4, 5, 6, 7]);
+    expect(result.ran.map((r) => r.version)).toEqual([3, 4, 5, 6, 7, 8]);
 
     const user = db.prepare(`SELECT email FROM users WHERE id = ?`).get('u1');
     const board = db.prepare(`SELECT title FROM boards WHERE id = ?`).get('b1');
@@ -109,7 +110,7 @@ describe('schema migrations', () => {
   it('migrateDown can roll back then up again', () => {
     const db = new Database(tempDbPath());
     migrateUp(db);
-    const down = migrateDown(db, { steps: 5 });
+    const down = migrateDown(db, { steps: 6 });
     expect(down.to).toBe(2);
 
     const membersGone = db
@@ -147,7 +148,7 @@ describe('schema migrations', () => {
     migrateUp(db, { targetVersion: 1 });
     const status = getMigrationStatus(db);
     expect(status.current).toBe(1);
-    expect(status.pending.map((p) => p.version)).toEqual([2, 3, 4, 5, 6, 7]);
+    expect(status.pending.map((p) => p.version)).toEqual([2, 3, 4, 5, 6, 7, 8]);
     db.close();
   });
 

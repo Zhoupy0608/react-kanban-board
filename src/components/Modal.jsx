@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { styles } from '../styles/kanbanStyles';
 
 export function Modal({
   open,
@@ -36,35 +35,45 @@ export function Modal({
 
   return (
     <div
-      style={styles.modalOverlay}
+      className="modal-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         ref={panelRef}
-        style={styles.modalPanel}
+        className={`modal-panel${danger ? ' modal-panel--danger' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <h3 style={styles.modalTitle}>{title}</h3>
+        <header className="modal-head">
+          <h3 className="modal-title">{title}</h3>
+          <button
+            type="button"
+            className="modal-close"
+            aria-label="关闭"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </header>
         <form
+          className="modal-form"
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
           }}
         >
-          {children}
-          <div style={styles.modalActions}>
-            <button type="button" style={styles.modalCancelBtn} onClick={onClose}>
+          <div className="modal-body">{children}</div>
+          <div className="modal-actions">
+            <button type="button" className="modal-cancel" onClick={onClose}>
               {cancelLabel}
             </button>
             <button
               type="submit"
               className={danger ? 'modal-submit-danger' : 'modal-submit'}
-              style={danger ? undefined : styles.modalSubmitBtn}
             >
               {submitLabel}
             </button>

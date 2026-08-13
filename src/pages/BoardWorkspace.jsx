@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CardDrawer } from '../components/CardDrawer';
 import { FilterBar } from '../components/FilterBar';
@@ -25,6 +25,16 @@ const EMPTY_DIALOG = {
   dueDate: '',
 };
 
+const DEFAULT_LANE_WIDTH = 280;
+
+function laneWidthsKey(boardId) {
+  return `mykanban_lane_widths_${boardId || 'default'}`;
+}
+
+function laneHeightsKey(boardId) {
+  return `mykanban_lane_heights_${boardId || 'default'}`;
+}
+
 function cardMatchesFilters(card, keyword, selectedTags, dueFilter) {
   if (!cardMatchesDueFilter(card, dueFilter)) return false;
 
@@ -48,7 +58,7 @@ function cardMatchesFilters(card, keyword, selectedTags, dueFilter) {
 
 function IconHome() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" />
     </svg>
   );
@@ -86,15 +96,6 @@ function IconBell() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M6 17h12l-1.2-2V10a4.8 4.8 0 1 0-9.6 0v5L6 17Z" />
       <path d="M10 17a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}
-
-function IconBoards() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="4" width="7" height="16" rx="1.5" />
-      <rect x="14" y="4" width="7" height="10" rx="1.5" />
     </svg>
   );
 }
@@ -163,6 +164,62 @@ export default function BoardWorkspace() {
   const [shareOpen, setShareOpen] = useState(false);
   const [liveHint, setLiveHint] = useState(null);
   const [commentSignal, setCommentSignal] = useState(0);
+  const [laneWidths, setLaneWidths] = useState({});
+  const [laneHeights, setLaneHeights] = useState({});
+
+  useEffect(() => {
+    if (!boardId) {
+      setLaneWidths({});
+      setLaneHeights({});
+      return;
+    }
+    try {
+      const rawW = localStorage.getItem(laneWidthsKey(boardId));
+      const parsedW = rawW ? JSON.parse(rawW) : {};
+      setLaneWidths(parsedW && typeof parsedW === 'object' ? parsedW : {});
+    } catch {
+      setLaneWidths({});
+    }
+    try {
+      const rawH = localStorage.getItem(laneHeightsKey(boardId));
+      const parsedH = rawH ? JSON.parse(rawH) : {};
+      setLaneHeights(parsedH && typeof parsedH === 'object' ? parsedH : {});
+    } catch {
+      setLaneHeights({});
+    }
+  }, [boardId]);
+
+  const handleLaneWidthChange = useCallback(
+    (laneId, nextWidth) => {
+      if (!laneId) return;
+      setLaneWidths((prev) => {
+        const next = { ...prev, [laneId]: nextWidth };
+        try {
+          localStorage.setItem(laneWidthsKey(boardId), JSON.stringify(next));
+        } catch {
+          /* ignore quota */
+        }
+        return next;
+      });
+    },
+    [boardId]
+  );
+
+  const handleLaneHeightChange = useCallback(
+    (laneId, nextHeight) => {
+      if (!laneId) return;
+      setLaneHeights((prev) => {
+        const next = { ...prev, [laneId]: nextHeight };
+        try {
+          localStorage.setItem(laneHeightsKey(boardId), JSON.stringify(next));
+        } catch {
+          /* ignore quota */
+        }
+        return next;
+      });
+    },
+    [boardId]
+  );
 
   useRealtime({
     boardId,
@@ -449,7 +506,7 @@ export default function BoardWorkspace() {
               data-tooltip="全部看板"
               aria-label="全部看板"
             >
-              <IconBoards />
+              <IconHome />
             </Link>
             <button
               type="button"
@@ -473,11 +530,16 @@ export default function BoardWorkspace() {
             >
               <IconBell />
             </button>
-            <div className="user-chip" title={user?.email}>
+            <Link
+              to="/profile"
+              className="user-chip"
+              title={user?.email || '个人页'}
+              aria-label="打开个人页"
+            >
               <span className="user-avatar">{(user?.name || 'U').slice(0, 1)}</span>
               {user?.name || 'User'}
               {role === 'viewer' ? <em className="role-pill">只读</em> : null}
-            </div>
+            </Link>
             <button type="button" className="ghost-btn" onClick={logout}>
               退出
             </button>
@@ -563,50 +625,56 @@ export default function BoardWorkspace() {
               onGoBoard={goBoard}
             />
           ) : activeView === 'board' ? (
-            <div className="board-row" style={styles.boardRow}>
-              {filteredData.map((lane, index) => {
-                const realIndex = data.findIndex((l) => l.id === lane.id);
-                return (
-                  <Lane
-                    key={lane.id}
-                    index={realIndex >= 0 ? realIndex : index}
-                    lane={lane}
-                    boardId={boardId}
-                    readOnly={readOnly}
-                    addCard={readOnly ? () => {} : openAddCard}
-                    onAddCards={
-                      readOnly
-                        ? undefined
-                        : (laneId, cards) => {
-                            addCards(laneId, cards);
-                          }
-                    }
-                    onDragStart={readOnly ? () => {} : onDragStart}
-                    onDragEnd={onDragEnd}
-                    onDrop={readOnly ? () => {} : onDrop}
-                    deleteCard={readOnly ? () => {} : requestDeleteCard}
-                    onOpenCard={(laneId, cardId) => setDrawer({ laneId, cardId })}
-                    onRenameLane={readOnly ? () => {} : openRenameLane}
-                    onDeleteLane={readOnly ? () => {} : requestDeleteLane}
-                    onLaneDragStart={readOnly ? () => {} : onLaneDragStart}
-                    onLaneDrop={readOnly ? () => {} : onLaneDrop}
-                    draggedCardId={draggedCard?.cardId}
-                    onDragOver={onDragOver}
-                  />
-                );
-              })}
+            <div className="board-viewport">
+              <div className="board-row" style={styles.boardRow}>
+                {filteredData.map((lane, index) => {
+                  const realIndex = data.findIndex((l) => l.id === lane.id);
+                  return (
+                    <Lane
+                      key={lane.id}
+                      index={realIndex >= 0 ? realIndex : index}
+                      lane={lane}
+                      boardId={boardId}
+                      width={laneWidths[lane.id] || DEFAULT_LANE_WIDTH}
+                      height={laneHeights[lane.id] || null}
+                      onWidthChange={handleLaneWidthChange}
+                      onHeightChange={handleLaneHeightChange}
+                      readOnly={readOnly}
+                      addCard={readOnly ? () => {} : openAddCard}
+                      onAddCards={
+                        readOnly
+                          ? undefined
+                          : (laneId, cards) => {
+                              addCards(laneId, cards);
+                            }
+                      }
+                      onDragStart={readOnly ? () => {} : onDragStart}
+                      onDragEnd={onDragEnd}
+                      onDrop={readOnly ? () => {} : onDrop}
+                      deleteCard={readOnly ? () => {} : requestDeleteCard}
+                      onOpenCard={(laneId, cardId) => setDrawer({ laneId, cardId })}
+                      onRenameLane={readOnly ? () => {} : openRenameLane}
+                      onDeleteLane={readOnly ? () => {} : requestDeleteLane}
+                      onLaneDragStart={readOnly ? () => {} : onLaneDragStart}
+                      onLaneDrop={readOnly ? () => {} : onLaneDrop}
+                      draggedCardId={draggedCard?.cardId}
+                      onDragOver={onDragOver}
+                    />
+                  );
+                })}
 
-              {!readOnly ? (
-                <div
-                  className="add-lane-btn"
-                  onClick={openAddLane}
-                  onKeyDown={(e) => e.key === 'Enter' && openAddLane()}
-                  role="button"
-                  tabIndex={0}
-                >
-                  + 添加新列
-                </div>
-              ) : null}
+                {!readOnly ? (
+                  <div
+                    className="add-lane-btn"
+                    onClick={openAddLane}
+                    onKeyDown={(e) => e.key === 'Enter' && openAddLane()}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    + 添加新列
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : activeView === 'list' ? (
             <ListView
@@ -644,27 +712,26 @@ export default function BoardWorkspace() {
         submitLabel={dialog.type === 'renameLane' ? '保存' : '添加'}
       >
         {(dialog.type === 'addCard' || dialog.type === 'addLane' || dialog.type === 'renameLane') && (
-          <>
-            <label style={styles.modalLabel}>
+          <div className="modal-field">
+            <label className="modal-field-label">
               {dialog.type === 'addCard' ? '标题' : '列名称'}
             </label>
             <input
               className="modal-input"
-              style={styles.modalInput}
               value={dialog.text}
               placeholder={dialog.type === 'addCard' ? '请输入标题' : '例如：待处理'}
               onChange={(e) => setDialog((prev) => ({ ...prev, text: e.target.value }))}
             />
-          </>
+          </div>
         )}
 
         {dialog.type === 'addCard' && (
           <>
             {data.length > 1 && (
-              <>
-                <label style={styles.modalLabel}>所属列</label>
+              <div className="modal-field">
+                <label className="modal-field-label">所属列</label>
                 <select
-                  className="drawer-select"
+                  className="modal-select"
                   value={dialog.laneId || ''}
                   onChange={(e) => setDialog((prev) => ({ ...prev, laneId: e.target.value }))}
                 >
@@ -674,24 +741,26 @@ export default function BoardWorkspace() {
                     </option>
                   ))}
                 </select>
-              </>
+              </div>
             )}
-            <label style={styles.modalLabel}>标签（逗号分隔，可选）</label>
-            <input
-              className="modal-input"
-              style={styles.modalInput}
-              value={dialog.tagsText}
-              placeholder="例如：紧急, 开发"
-              onChange={(e) => setDialog((prev) => ({ ...prev, tagsText: e.target.value }))}
-            />
-            <label style={styles.modalLabel}>截止日期（可选）</label>
-            <input
-              className="modal-input"
-              style={styles.modalInput}
-              type="date"
-              value={dialog.dueDate}
-              onChange={(e) => setDialog((prev) => ({ ...prev, dueDate: e.target.value }))}
-            />
+            <div className="modal-field">
+              <label className="modal-field-label">标签（逗号分隔，可选）</label>
+              <input
+                className="modal-input"
+                value={dialog.tagsText}
+                placeholder="例如：紧急, 开发"
+                onChange={(e) => setDialog((prev) => ({ ...prev, tagsText: e.target.value }))}
+              />
+            </div>
+            <div className="modal-field">
+              <label className="modal-field-label">截止日期（可选）</label>
+              <input
+                className="modal-input"
+                type="date"
+                value={dialog.dueDate}
+                onChange={(e) => setDialog((prev) => ({ ...prev, dueDate: e.target.value }))}
+              />
+            </div>
           </>
         )}
       </Modal>

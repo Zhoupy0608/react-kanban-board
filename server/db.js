@@ -309,6 +309,26 @@ export function bumpTokenVersion(db, userId) {
   return getUserById(db, userId);
 }
 
+/**
+ * 更新用户昵称与邮箱。邮箱冲突时抛出 err.code = 'EMAIL_TAKEN'。
+ */
+export function updateUserProfile(db, userId, { name, email }) {
+  const nextName = String(name || '').trim();
+  const nextEmail = String(email || '').trim().toLowerCase();
+  const existing = getUserByEmail(db, nextEmail);
+  if (existing && existing.id !== userId) {
+    const err = new Error('该邮箱已被占用');
+    err.code = 'EMAIL_TAKEN';
+    throw err;
+  }
+  db.prepare(`UPDATE users SET name = ?, email = ? WHERE id = ?`).run(
+    nextName,
+    nextEmail,
+    userId
+  );
+  return getUserById(db, userId);
+}
+
 export function listBoards(db, userId) {
   return db
     .prepare(
@@ -549,6 +569,91 @@ export function listActivity(db, boardId, limit = 40) {
        LIMIT ?`
     )
     .all(boardId, safeLimit);
+}
+
+function mapDraft(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    description: row.description || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function listBoardDrafts(db, userId) {
+  return db
+    .prepare(
+      `SELECT id, user_id, title, description, created_at, updated_at
+       FROM board_drafts
+       WHERE user_id = ?
+       ORDER BY updated_at DESC`
+    )
+    .all(userId)
+    .map(mapDraft);
+}
+
+export function getBoardDraft(db, draftId, userId) {
+  const row = db
+    .prepare(
+      `SELECT id, user_id, title, description, created_at, updated_at
+       FROM board_drafts
+       WHERE id = ? AND user_id = ?`
+    )
+    .get(draftId, userId);
+  return mapDraft(row);
+}
+
+export function createBoardDraft(db, { userId, title, description = '' }) {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  const safeTitle = String(title || '').trim() || '未命名草稿';
+  const safeDesc = String(description || '').trim();
+  db.prepare(
+    `INSERT INTO board_drafts (id, user_id, title, description, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, safeTitle, safeDesc, now, now);
+  return getBoardDraft(db, id, userId);
+}
+
+export function updateBoardDraft(db, draftId, userId, patch) {
+  const current = getBoardDraft(db, draftId, userId);
+  if (!current) return null;
+  const title =
+    patch.title !== undefined ? String(patch.title).trim() || '未命名草稿' : current.title;
+  const description =
+    patch.description !== undefined
+      ? String(patch.description).trim()
+      : current.description;
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE board_drafts SET title = ?, description = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+  ).run(title, description, now, draftId, userId);
+  return getBoardDraft(db, draftId, userId);
+}
+
+export function deleteBoardDraft(db, draftId, userId) {
+  const result = db
+    .prepare(`DELETE FROM board_drafts WHERE id = ? AND user_id = ?`)
+    .run(draftId, userId);
+  return result.changes > 0;
+}
+
+/**
+ * 将草稿发布为正式看板，并删除草稿。
+ */
+export function publishBoardDraft(db, draftId, userId) {
+  const draft = getBoardDraft(db, draftId, userId);
+  if (!draft) return null;
+  const board = createBoard(db, {
+    ownerId: userId,
+    title: draft.title,
+    description: draft.description,
+  });
+  deleteBoardDraft(db, draftId, userId);
+  return { board, draft };
 }
 
 export const DEMO_CREDENTIALS = {

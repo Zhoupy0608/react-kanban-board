@@ -3,6 +3,7 @@ import {
   createUser,
   getUserByEmail,
   getUserById,
+  updateUserProfile,
 } from '../db.js';
 import {
   createRequireAuth,
@@ -103,6 +104,43 @@ export function createAuthRouter(db) {
         created_at: user.created_at,
       },
     });
+  });
+
+  router.patch('/me', requireAuth, (req, res) => {
+    try {
+      const name = String(req.body?.name ?? '').trim();
+      const email = String(req.body?.email ?? '').trim().toLowerCase();
+
+      if (!name || name.length < 2) {
+        return res.status(400).json({ success: false, message: '昵称至少 2 个字符' });
+      }
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ success: false, message: '请输入有效邮箱' });
+      }
+
+      const user = updateUserProfile(db, req.user.id, { name, email });
+      if (!user) {
+        return res.status(401).json({ success: false, message: '用户不存在' });
+      }
+
+      const token = signToken(user);
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          created_at: user.created_at,
+        },
+      });
+    } catch (err) {
+      if (err?.code === 'EMAIL_TAKEN') {
+        return res.status(409).json({ success: false, message: err.message || '该邮箱已被占用' });
+      }
+      console.error('更新资料失败:', err);
+      return res.status(500).json({ success: false, message: '更新资料失败' });
+    }
   });
 
   router.post('/logout', requireAuth, (req, res) => {
