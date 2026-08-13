@@ -32,8 +32,6 @@ npm install
 npm start
 ```
 
-浏览器打开终端提示的地址（默认 **http://localhost:5000**）。
-
 ### 演示账号
 
 | 邮箱 | 密码 |
@@ -67,6 +65,22 @@ npm start
 - **个人页**：点击顶栏用户胶囊进入，可修改昵称 / 邮箱。
 - **双窗口协作**：登录态在 `sessionStorage`，每个窗口独立；分别登录 demo / collab 即可联调。
 - **板内 AI**：复制 `.env.example` 为 `.env`，配置 `AI_API_KEY`（及可选 `AI_BASE_URL` / `AI_MODEL`）。国内模型一般无需 `AI_HTTP_PROXY`。
+
+---
+
+## 界面预览
+
+**图 2 · 看板列表** — 正式看板与草稿箱，支持添加、发布与删除
+
+![看板列表](docs/screenshots/boards.png)
+
+**图 3 · 看板视图** — 多列拖拽、筛选与 AI 添加卡片
+
+![看板视图](docs/screenshots/board.png)
+
+**图 4 · 列表视图** — 表格化浏览任务、标签与截止日期
+
+![列表视图](docs/screenshots/list.png)
 
 ---
 
@@ -165,7 +179,7 @@ Schema 由 `server/migrations/` 管理（当前 **v8**）：
 - **Render**：见 `render.yaml`，控制台设置 `JWT_SECRET`
 - **Docker**：见 `Dockerfile`，传入 `JWT_SECRET`、`DATA_DIR`
 
-预览截图见 [`docs/screenshots/`](docs/screenshots/)。
+更多截图（概览 / 日历）见 [`docs/screenshots/`](docs/screenshots/)。
 
 ---
 
