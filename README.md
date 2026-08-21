@@ -1,8 +1,8 @@
 # React Kanban Board
 
-面向个人与小团队的轻量全栈看板：多视图拖拽排期、草稿箱、协作分享与可选板内 AI。数据落在本机 SQLite，前后端同进程启动，改完即同步。
+面向个人与小团队的轻量全栈看板：多视图拖拽排期、草稿箱、协作分享与可选板内 AI。默认使用 **MySQL + Redis**，前后端同进程启动，改完即同步。
 
-**技术栈：** React 19 + Vite 7 · Express 5 · better-sqlite3 · JWT + bcryptjs · WebSocket
+**技术栈：** React 19 + Vite 7 · Express 5 · MySQL · Redis · JWT + bcryptjs · WebSocket
 
 **仓库：** [Zhoupy0608/react-kanban-board](https://github.com/Zhoupy0608/react-kanban-board)
 
@@ -25,12 +25,16 @@
 
 ## 快速开始
 
-环境：Node.js 18+（推荐 22）
+环境：Node.js 18+（推荐 22）、Docker（用于 MySQL + Redis）
 
 ```bash
 npm install
+cp .env.example .env
+docker compose up -d
 npm start
 ```
+
+打开 `http://localhost:5000`。健康检查：`http://localhost:5000/api/health`（应看到 `dbDriver: "mysql"`、`redis: "connected"`）。
 
 ### 演示账号
 
@@ -39,22 +43,20 @@ npm start
 | `demo@mykanban.dev` | `demo1234` |
 | `collab@mykanban.dev` | `demo1234`（协作演示，需先被主账号邀请） |
 
-首次启动会自动执行数据库迁移并写入演示数据；**升级保留已有业务数据**。
+首次启动会自动建表并写入演示数据。
 
-> 清空数据：删除 `data/kanban.db`（或 `DATA_DIR` 下对应文件）后重启。  
-> 无 `schema_meta` 的极旧库默认拒绝启动；确认可丢弃时设 `ALLOW_LEGACY_DB_RESET=1`。
+> 数据在 Docker MySQL 卷中。清空可执行：`docker compose down -v` 后重新 `docker compose up -d`。  
+> Redis 默认必连；仅应急可设 `REDIS_OPTIONAL=1`（不推荐）。
 
 ### 常用命令
 
 | 命令 | 说明 |
 | --- | --- |
+| `npm run docker:up` | 启动 MySQL + Redis |
 | `npm start` / `npm run dev` | 开发：Express + Vite HMR，端口 5000 |
 | `npm run build` | 构建前端到 `dist/` |
 | `npm run start:prod` | 生产模式（静态 `dist`） |
-| `npm test` | API / 迁移测试 |
-| `npm run migrate` | 查看 schema 状态 |
-| `npm run migrate:up` | 升级到最新 schema |
-| `npm run migrate:down` | 回退一步（仅开发） |
+| `npm test` | API 测试（需 Docker 已启动） |
 | `npm run share` | cpolar 公网临时分享 |
 
 ---
@@ -189,7 +191,7 @@ Schema 由 `server/migrations/` 管理（当前 **v8**）：
 ## 部署
 
 - **Render**：见 `render.yaml`，控制台设置 `JWT_SECRET`
-- **Docker**：见 `Dockerfile`，传入 `JWT_SECRET`、`DATA_DIR`
+- **Docker**：见 `Dockerfile`；需配置 `JWT_SECRET`、`MYSQL_*`、`REDIS_URL`
 
 ---
 
@@ -198,11 +200,11 @@ Schema 由 `server/migrations/` 管理（当前 **v8**）：
 **登录后 401？**  
 Token 过期或未带 `Authorization`，重新登录即可。
 
-**列表页草稿报错 / 500？**  
-确认已跑到 schema v8：`npm run migrate:up` 后重启服务。
+**启动报 MySQL / Redis 连接失败？**  
+先执行 `docker compose up -d`（或 `npm run docker:up`），确认 `.env` 中 `MYSQL_*` / `REDIS_URL` 正确。健康检查：`http://localhost:5000/api/health`。
 
-**想恢复演示数据？**  
-删除数据库文件后 `npm start`。
+**想清空业务数据？**  
+`docker compose down -v` 后重新 `docker compose up -d`，再 `npm start`（会重建表并写入演示账号）。
 
-**Windows 编译 better-sqlite3 失败？**  
-安装 [VS Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（勾选 C++ 桌面开发）后再 `npm install`。
+**本机没有 Docker？**  
+需要可用的 MySQL 8 与 Redis 7，并在 `.env` 填对应连接信息。

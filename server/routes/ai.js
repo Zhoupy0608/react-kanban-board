@@ -13,10 +13,10 @@ import {
   injectLaneTasks,
 } from '../ai.js';
 
-function checkEditAccess(db, boardId, userId) {
-  const access = getBoardAccess(db, boardId, userId);
+async function checkEditAccess(db, boardId, userId) {
+  const access = await getBoardAccess(db, boardId, userId);
   if (access && canEditBoard(access)) return { access };
-  if (!getBoardMeta(db, boardId)) return { error: 404, message: '看板不存在' };
+  if (!(await getBoardMeta(db, boardId))) return { error: 404, message: '看板不存在' };
   if (access) return { error: 403, message: '只读成员无法使用板内 AI' };
   return { error: 403, message: '无权访问该看板' };
 }
@@ -61,7 +61,7 @@ export function createAiRouter(db) {
         return res.status(400).json({ success: false, message: '卡片标题不能为空' });
       }
 
-      const gate = checkEditAccess(db, boardId, req.user.id);
+      const gate = await checkEditAccess(db, boardId, req.user.id);
       if (gate.error) {
         return res.status(gate.error).json({ success: false, message: gate.message });
       }
@@ -98,7 +98,7 @@ export function createAiRouter(db) {
         return res.status(400).json({ success: false, message: '卡片标题不能为空' });
       }
 
-      const gate = checkEditAccess(db, boardId, req.user.id);
+      const gate = await checkEditAccess(db, boardId, req.user.id);
       if (gate.error) {
         return res.status(gate.error).json({ success: false, message: gate.message });
       }
@@ -136,7 +136,7 @@ export function createAiRouter(db) {
         return res.status(400).json({ success: false, message: '卡片标题不能为空' });
       }
 
-      const gate = checkEditAccess(db, boardId, req.user.id);
+      const gate = await checkEditAccess(db, boardId, req.user.id);
       if (gate.error) {
         return res.status(gate.error).json({ success: false, message: gate.message });
       }
@@ -174,7 +174,7 @@ export function createAiRouter(db) {
         return res.status(400).json({ success: false, message: '卡片标题不能为空' });
       }
 
-      const gate = checkEditAccess(db, boardId, req.user.id);
+      const gate = await checkEditAccess(db, boardId, req.user.id);
       if (gate.error) {
         return res.status(gate.error).json({ success: false, message: gate.message });
       }
@@ -212,7 +212,7 @@ export function createAiRouter(db) {
         return res.status(400).json({ success: false, message: '卡片标题不能为空' });
       }
 
-      const gate = checkEditAccess(db, boardId, req.user.id);
+      const gate = await checkEditAccess(db, boardId, req.user.id);
       if (gate.error) {
         return res.status(gate.error).json({ success: false, message: gate.message });
       }
@@ -254,7 +254,7 @@ export function createAiRouter(db) {
         return res.status(400).json({ success: false, message: '请输入生成说明' });
       }
 
-      const gate = checkEditAccess(db, boardId, req.user.id);
+      const gate = await checkEditAccess(db, boardId, req.user.id);
       if (gate.error) {
         return res.status(gate.error).json({ success: false, message: gate.message });
       }

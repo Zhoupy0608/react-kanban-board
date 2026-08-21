@@ -15,9 +15,9 @@ export function createDraftsRouter(db) {
   const requireAuth = createRequireAuth(db);
   router.use(requireAuth);
 
-  router.get('/', (req, res) => {
+  router.get('/', async (req, res) => {
     try {
-      const drafts = listBoardDrafts(db, req.user.id);
+      const drafts = await listBoardDrafts(db, req.user.id);
       return res.json({ success: true, drafts });
     } catch (err) {
       console.error('列出草稿失败:', err);
@@ -25,14 +25,14 @@ export function createDraftsRouter(db) {
     }
   });
 
-  router.post('/', (req, res) => {
+  router.post('/', async (req, res) => {
     try {
       const title = String(req.body?.title || '').trim();
       const description = String(req.body?.description || '').trim();
       if (!title) {
         return res.status(400).json({ success: false, message: '草稿标题不能为空' });
       }
-      const draft = createBoardDraft(db, {
+      const draft = await createBoardDraft(db, {
         userId: req.user.id,
         title,
         description,
@@ -44,9 +44,9 @@ export function createDraftsRouter(db) {
     }
   });
 
-  router.patch('/:id', (req, res) => {
+  router.patch('/:id', async (req, res) => {
     try {
-      const draft = updateBoardDraft(db, req.params.id, req.user.id, {
+      const draft = await updateBoardDraft(db, req.params.id, req.user.id, {
         title: req.body?.title,
         description: req.body?.description,
       });
@@ -60,9 +60,9 @@ export function createDraftsRouter(db) {
     }
   });
 
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', async (req, res) => {
     try {
-      const ok = deleteBoardDraft(db, req.params.id, req.user.id);
+      const ok = await deleteBoardDraft(db, req.params.id, req.user.id);
       if (!ok) {
         return res.status(404).json({ success: false, message: '草稿不存在' });
       }
@@ -73,18 +73,18 @@ export function createDraftsRouter(db) {
     }
   });
 
-  router.post('/:id/publish', (req, res) => {
+  router.post('/:id/publish', async (req, res) => {
     try {
-      const existing = getBoardDraft(db, req.params.id, req.user.id);
+      const existing = await getBoardDraft(db, req.params.id, req.user.id);
       if (!existing) {
         return res.status(404).json({ success: false, message: '草稿不存在' });
       }
-      const result = publishBoardDraft(db, req.params.id, req.user.id);
+      const result = await publishBoardDraft(db, req.params.id, req.user.id);
       if (!result) {
         return res.status(404).json({ success: false, message: '草稿不存在' });
       }
 
-      logActivity(db, {
+      await logActivity(db, {
         boardId: result.board.id,
         userId: req.user.id,
         action: 'board.created',

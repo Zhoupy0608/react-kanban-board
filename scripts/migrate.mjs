@@ -1,70 +1,44 @@
 #!/usr/bin/env node
 /**
- * 数据库迁移 CLI
+ * MySQL schema 状态 CLI
  *   node scripts/migrate.mjs status
- *   node scripts/migrate.mjs up
- *   node scripts/migrate.mjs down [--steps 1]
+ *
+ * 说明：MySQL 使用全量 schema.sql（server/migrations/mysql/schema.sql），
+ * 启动时自动建表；此处仅查看 schema_meta 版本。
  */
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import Database from 'better-sqlite3';
-import {
-  getMigrationStatus,
-  migrateDown,
-  migrateUp,
-} from '../server/migrations/index.js';
+import 'dotenv/config';
+import { openMysqlDb, MYSQL_SCHEMA_VERSION } from '../server/db/mysql.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-const dbPath = path.join(dataDir, 'kanban.db');
+const [, , cmd = 'status'] = process.argv;
 
-const [, , cmd = 'status', ...rest] = process.argv;
-
-function parseSteps(args) {
-  const idx = args.indexOf('--steps');
-  if (idx >= 0) return Math.max(1, Number(args[idx + 1]) || 1);
-  return 1;
-}
-
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-const db = new Database(dbPath);
-
-try {
-  if (cmd === 'status') {
-    const status = getMigrationStatus(db);
-    console.log(`数据库: ${dbPath}`);
-    console.log(`当前版本: v${status.current}`);
-    console.log(`最新版本: v${status.latest}`);
-    if (status.pending.length === 0) {
-      console.log('待执行: （无）');
-    } else {
-      console.log('待执行:');
-      for (const m of status.pending) {
-        console.log(`  - v${m.version} ${m.name}`);
-      }
-    }
-  } else if (cmd === 'up') {
-    const result = migrateUp(db);
-    if (result.ran.length === 0) {
-      console.log(`已是最新 v${result.to}`);
-    } else {
-      console.log(`升级完成: v${result.from} → v${result.to}`);
-      for (const m of result.ran) console.log(`  + v${m.version} ${m.name}`);
-    }
-  } else if (cmd === 'down') {
-    const steps = parseSteps(rest);
-    const result = migrateDown(db, { steps });
-    if (result.ran.length === 0) {
-      console.log(`无法再回退（当前 v${result.to}）`);
-    } else {
-      console.log(`已回退: v${result.from} → v${result.to}`);
-      for (const m of result.ran) console.log(`  - v${m.version} ${m.name}`);
-    }
-  } else {
-    console.error('用法: node scripts/migrate.mjs <status|up|down> [--steps N]');
+async function main() {
+  if (cmd !== 'status') {
+    console.error('用法: node scripts/migrate.mjs status');
+    console.error('MySQL 表结构在服务启动时自动确保（schema.sql）。');
     process.exitCode = 1;
+    return;
   }
-} finally {
-  db.close();
+
+  const db = await openMysqlDb();
+  try {
+    const row = await db.get('SELECT version FROM schema_meta WHERE id = 1');
+    const current = Number(row?.version) || 0;
+    console.log(
+      `MySQL: ${process.env.MYSQL_HOST || '127.0.0.1'}:${process.env.MYSQL_PORT || 3306}/${process.env.MYSQL_DATABASE || 'kanban'}`
+    );
+    console.log(`当前版本: v${current}`);
+    console.log(`应用期望: v${MYSQL_SCHEMA_VERSION}`);
+    if (current === MYSQL_SCHEMA_VERSION) {
+      console.log('状态: 已对齐');
+    } else {
+      console.log('状态: 版本不一致，请检查 schema.sql 是否已应用');
+    }
+  } finally {
+    await db.close();
+  }
 }
+
+main().catch((err) => {
+  console.error(err.message || err);
+  process.exit(1);
+});

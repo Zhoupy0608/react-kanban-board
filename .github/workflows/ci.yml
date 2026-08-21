@@ -8,6 +8,33 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: kanban
+          MYSQL_USER: kanban
+          MYSQL_PASSWORD: kanban
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ukanban -pkanban"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,6 +50,13 @@ jobs:
         run: npm test
         env:
           JWT_SECRET: ci-test-secret
+          DB_DRIVER: mysql
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: kanban
+          MYSQL_PASSWORD: kanban
+          MYSQL_DATABASE: kanban
+          REDIS_URL: redis://127.0.0.1:6379
 
       - name: Build frontend
         run: npm run build

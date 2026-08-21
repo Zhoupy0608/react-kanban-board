@@ -1,13 +1,8 @@
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../server/createApp.js';
 import { authenticateWsCredential, signToken, signWsTicket } from '../server/auth.js';
 import { getUserByEmail } from '../server/db.js';
-
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mykanban-sec-'));
+import { setupTestApp, teardownTestApp } from './helpers.js';
 
 describe('security hardening', () => {
   let app;
@@ -15,10 +10,9 @@ describe('security hardening', () => {
   let token;
 
   beforeAll(async () => {
-    process.env.JWT_SECRET = 'test-secret-security';
     process.env.AUTH_RATE_LIMIT_MAX = '8';
     process.env.AUTH_RATE_LIMIT_WINDOW_MS = '60000';
-    ({ app, db } = createApp({ dataDir }));
+    ({ app, db } = await setupTestApp());
 
     const reg = await request(app).post('/api/auth/register').send({
       email: 'sec@example.com',
@@ -26,11 +20,10 @@ describe('security hardening', () => {
       password: 'secret12',
     });
     token = reg.body.token;
-  });
+  }, 60000);
 
-  afterAll(() => {
-    db?.close?.();
-    fs.rmSync(dataDir, { recursive: true, force: true });
+  afterAll(async () => {
+    await teardownTestApp(db);
     delete process.env.AUTH_RATE_LIMIT_MAX;
     delete process.env.AUTH_RATE_LIMIT_WINDOW_MS;
   });
@@ -72,7 +65,7 @@ describe('security hardening', () => {
     expect(res.status).toBe(200);
     expect(res.body.ticket).toBeTruthy();
 
-    const user = authenticateWsCredential(db, res.body.ticket);
+    const user = await authenticateWsCredential(db, res.body.ticket);
     expect(user.email).toBe('sec@example.com');
     expect(user.typ).toBe('ws');
   });
@@ -100,12 +93,12 @@ describe('security hardening', () => {
     expect(lastStatus).toBe(429);
   });
 
-  it('signToken embeds token version', () => {
-    const row = getUserByEmail(db, 'sec@example.com');
+  it('signToken embeds token version', async () => {
+    const row = await getUserByEmail(db, 'sec@example.com');
     const t = signToken(row);
     const ws = signWsTicket(row);
     expect(t).toBeTruthy();
     expect(ws).toBeTruthy();
-    expect(authenticateWsCredential(db, t).typ).toBe('access');
+    expect((await authenticateWsCredential(db, t)).typ).toBe('access');
   });
 });

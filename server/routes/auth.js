@@ -25,7 +25,7 @@ export function createAuthRouter(db) {
     message: '登录/注册尝试过多，请稍后再试',
   });
 
-  router.post('/register', authLimiter, (req, res) => {
+  router.post('/register', authLimiter, async (req, res) => {
     try {
       const email = String(req.body?.email || '').trim().toLowerCase();
       const name = String(req.body?.name || '').trim();
@@ -40,11 +40,11 @@ export function createAuthRouter(db) {
       if (password.length < 6) {
         return res.status(400).json({ success: false, message: '密码至少 6 位' });
       }
-      if (getUserByEmail(db, email)) {
+      if (await getUserByEmail(db, email)) {
         return res.status(409).json({ success: false, message: '该邮箱已注册' });
       }
 
-      const user = createUser(db, {
+      const user = await createUser(db, {
         email,
         name,
         passwordHash: hashPassword(password),
@@ -61,11 +61,11 @@ export function createAuthRouter(db) {
     }
   });
 
-  router.post('/login', authLimiter, (req, res) => {
+  router.post('/login', authLimiter, async (req, res) => {
     try {
       const email = String(req.body?.email || '').trim();
       const password = String(req.body?.password || '');
-      const row = getUserByEmail(db, email);
+      const row = await getUserByEmail(db, email);
 
       if (!row || !verifyPassword(password, row.password_hash)) {
         return res.status(401).json({ success: false, message: '邮箱或密码错误' });
@@ -90,8 +90,8 @@ export function createAuthRouter(db) {
     }
   });
 
-  router.get('/me', requireAuth, (req, res) => {
-    const user = getUserById(db, req.user.id);
+  router.get('/me', requireAuth, async (req, res) => {
+    const user = await getUserById(db, req.user.id);
     if (!user) {
       return res.status(401).json({ success: false, message: '用户不存在' });
     }
@@ -106,7 +106,7 @@ export function createAuthRouter(db) {
     });
   });
 
-  router.patch('/me', requireAuth, (req, res) => {
+  router.patch('/me', requireAuth, async (req, res) => {
     try {
       const name = String(req.body?.name ?? '').trim();
       const email = String(req.body?.email ?? '').trim().toLowerCase();
@@ -118,7 +118,7 @@ export function createAuthRouter(db) {
         return res.status(400).json({ success: false, message: '请输入有效邮箱' });
       }
 
-      const user = updateUserProfile(db, req.user.id, { name, email });
+      const user = await updateUserProfile(db, req.user.id, { name, email });
       if (!user) {
         return res.status(401).json({ success: false, message: '用户不存在' });
       }
@@ -143,9 +143,9 @@ export function createAuthRouter(db) {
     }
   });
 
-  router.post('/logout', requireAuth, (req, res) => {
+  router.post('/logout', requireAuth, async (req, res) => {
     try {
-      revokeUserTokens(db, req.user.id);
+      await revokeUserTokens(db, req.user.id);
       return res.json({ success: true, message: '已退出，当前令牌已失效' });
     } catch (err) {
       console.error('退出失败:', err);
@@ -153,10 +153,9 @@ export function createAuthRouter(db) {
     }
   });
 
-  /** 换取短时 WS 票据，避免长期 JWT 出现在 URL / 代理日志中 */
-  router.post('/ws-ticket', requireAuth, (req, res) => {
+  router.post('/ws-ticket', requireAuth, async (req, res) => {
     try {
-      const user = getUserById(db, req.user.id);
+      const user = await getUserById(db, req.user.id);
       if (!user) {
         return res.status(401).json({ success: false, message: '用户不存在' });
       }

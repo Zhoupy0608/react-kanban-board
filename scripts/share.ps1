@@ -23,4 +23,9 @@ Write-Host "正在通过 cpolar 暴露本机 http://127.0.0.1:$port ..." -Foregr
 Write-Host "保持此窗口运行；关闭后公网链接会失效。" -ForegroundColor Yellow
 Write-Host ""
 
+# cpolar 不支持 socks5h 代理环境变量，分享时临时清空，避免启动失败
+foreach ($name in @('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy')) {
+  Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+}
+
 & $cpolar http $port -log=stdout

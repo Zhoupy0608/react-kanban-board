@@ -10,14 +10,20 @@ import { createDraftsRouter } from './routes/drafts.js';
 import { createNotificationsRouter } from './routes/notifications.js';
 import { createAiRouter } from './routes/ai.js';
 import { isAiConfigured } from './ai.js';
-import { getSchemaVersion } from './migrations/index.js';
+import { getDbSchemaVersion, resolveDbDriver } from './db/index.js';
+import { initRedis, getRedisMode } from './redis.js';
+import { getBoardCacheMode } from './cache.js';
 
 /**
- * 创建 Express app（可测：传入 dataDir / dbPath 隔离测试库）
+ * 创建 Express app（默认 MySQL + Redis）
  */
-export function createApp(options = {}) {
+export async function createApp(options = {}) {
   assertAuthConfig();
-  const db = options.db || openDb(options);
+  if (!options.skipRedis) {
+    await initRedis();
+  }
+
+  const db = options.db || (await openDb(options));
   const realtime = options.realtime || createRealtimeHub();
   const app = express();
 
@@ -25,14 +31,27 @@ export function createApp(options = {}) {
   app.use(cors(buildCorsOptions()));
   app.use(express.json({ limit: '2mb' }));
 
-  app.get('/api/health', (_req, res) => {
-    const features = ['auth', 'boards', 'drafts', 'members', 'comments', 'notifications', 'websocket'];
+  app.get('/api/health', async (_req, res) => {
+    const features = [
+      'auth',
+      'boards',
+      'drafts',
+      'members',
+      'comments',
+      'notifications',
+      'websocket',
+    ];
     if (isAiConfigured()) features.push('ai');
+    if (getRedisMode() === 'connected') features.push('redis');
+
     res.json({
       success: true,
       status: 'ok',
       time: new Date().toISOString(),
-      schemaVersion: getSchemaVersion(db),
+      schemaVersion: await getDbSchemaVersion(db),
+      dbDriver: db.driver || resolveDbDriver(options),
+      redis: getRedisMode(),
+      boardCache: getBoardCacheMode(),
       features,
       aiEnabled: isAiConfigured(),
     });

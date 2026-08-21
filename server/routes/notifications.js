@@ -13,14 +13,14 @@ export function createNotificationsRouter(db) {
   const requireAuth = createRequireAuth(db);
   router.use(requireAuth);
 
-  router.get('/', (req, res) => {
+  router.get('/', async (req, res) => {
     try {
       const unreadOnly = String(req.query.unread || '') === '1';
-      const items = listNotifications(db, req.user.id, {
+      const items = await listNotifications(db, req.user.id, {
         unreadOnly,
         limit: req.query.limit,
       });
-      const unread = countUnreadNotifications(db, req.user.id);
+      const unread = await countUnreadNotifications(db, req.user.id);
       return res.json({ success: true, notifications: items, unread });
     } catch (err) {
       console.error('读取通知失败:', err);
@@ -28,9 +28,9 @@ export function createNotificationsRouter(db) {
     }
   });
 
-  router.post('/read-all', (req, res) => {
+  router.post('/read-all', async (req, res) => {
     try {
-      markAllNotificationsRead(db, req.user.id);
+      await markAllNotificationsRead(db, req.user.id);
       return res.json({ success: true, unread: 0 });
     } catch (err) {
       console.error('标记已读失败:', err);
@@ -38,15 +38,15 @@ export function createNotificationsRouter(db) {
     }
   });
 
-  router.post('/:id/read', (req, res) => {
+  router.post('/:id/read', async (req, res) => {
     try {
-      const ok = markNotificationRead(db, req.user.id, req.params.id);
+      const ok = await markNotificationRead(db, req.user.id, req.params.id);
       if (!ok) {
         return res.status(404).json({ success: false, message: '通知不存在' });
       }
       return res.json({
         success: true,
-        unread: countUnreadNotifications(db, req.user.id),
+        unread: await countUnreadNotifications(db, req.user.id),
       });
     } catch (err) {
       console.error('标记已读失败:', err);
@@ -54,15 +54,15 @@ export function createNotificationsRouter(db) {
     }
   });
 
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', async (req, res) => {
     try {
-      const ok = deleteNotification(db, req.user.id, req.params.id);
+      const ok = await deleteNotification(db, req.user.id, req.params.id);
       if (!ok) {
         return res.status(404).json({ success: false, message: '通知不存在' });
       }
       return res.json({
         success: true,
-        unread: countUnreadNotifications(db, req.user.id),
+        unread: await countUnreadNotifications(db, req.user.id),
       });
     } catch (err) {
       console.error('删除通知失败:', err);

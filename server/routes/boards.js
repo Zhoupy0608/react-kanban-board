@@ -25,10 +25,10 @@ import {
   updateBoardMemberRole,
 } from '../collab.js';
 
-function checkAccess(db, boardId, userId) {
-  const access = getBoardAccess(db, boardId, userId);
+async function checkAccess(db, boardId, userId) {
+  const access = await getBoardAccess(db, boardId, userId);
   if (access) return { access };
-  if (!getBoardMeta(db, boardId)) return { error: 404, message: '看板不存在' };
+  if (!(await getBoardMeta(db, boardId))) return { error: 404, message: '看板不存在' };
   return { error: 403, message: '无权访问该看板' };
 }
 
@@ -46,9 +46,9 @@ export function createBoardsRouter(db, realtime = null) {
     });
   };
 
-  router.get('/', (req, res) => {
+  router.get('/', async (req, res) => {
     try {
-      const boards = listBoards(db, req.user.id);
+      const boards = await listBoards(db, req.user.id);
       return res.json({ success: true, boards });
     } catch (err) {
       console.error('列出看板失败:', err);
@@ -56,7 +56,7 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.post('/', (req, res) => {
+  router.post('/', async (req, res) => {
     try {
       const title = String(req.body?.title || '').trim();
       const description = String(req.body?.description || '').trim();
@@ -64,13 +64,13 @@ export function createBoardsRouter(db, realtime = null) {
         return res.status(400).json({ success: false, message: '看板标题不能为空' });
       }
 
-      const board = createBoard(db, {
+      const board = await createBoard(db, {
         ownerId: req.user.id,
         title,
         description,
       });
 
-      logActivity(db, {
+      await logActivity(db, {
         boardId: board.id,
         userId: req.user.id,
         action: 'board.created',
@@ -84,9 +84,9 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.get('/:id', (req, res) => {
+  router.get('/:id', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
@@ -100,9 +100,9 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.patch('/:id', (req, res) => {
+  router.patch('/:id', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
@@ -110,12 +110,12 @@ export function createBoardsRouter(db, realtime = null) {
         return res.status(403).json({ success: false, message: '无权编辑该看板' });
       }
 
-      const board = updateBoardMeta(db, req.params.id, {
+      const board = await updateBoardMeta(db, req.params.id, {
         title: req.body?.title,
         description: req.body?.description,
       });
 
-      logActivity(db, {
+      await logActivity(db, {
         boardId: board.id,
         userId: req.user.id,
         action: 'board.updated',
@@ -130,9 +130,9 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.delete('/:id', (req, res) => {
+  router.delete('/:id', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
@@ -142,7 +142,7 @@ export function createBoardsRouter(db, realtime = null) {
 
       const title = check.access.meta.title;
       const boardId = req.params.id;
-      deleteBoard(db, boardId);
+      await deleteBoard(db, boardId);
       emitBoard(boardId, 'board.deleted', { title });
       return res.json({ success: true, message: `已删除看板「${title}」` });
     } catch (err) {
@@ -151,13 +151,13 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.get('/:id/full', (req, res) => {
+  router.get('/:id/full', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
-      const full = getBoardFull(db, req.params.id);
+      const full = await getBoardFull(db, req.params.id);
       return res.json({
         success: true,
         role: check.access.role,
@@ -177,9 +177,9 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.put('/:id/full', (req, res) => {
+  router.put('/:id/full', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
@@ -202,12 +202,12 @@ export function createBoardsRouter(db, realtime = null) {
           : null;
       const force = !Array.isArray(body) && Boolean(body?.force);
 
-      const full = saveBoardFull(db, req.params.id, lanes, {
+      const full = await saveBoardFull(db, req.params.id, lanes, {
         expectedVersion,
         force,
       });
 
-      logActivity(db, {
+      await logActivity(db, {
         boardId: req.params.id,
         userId: req.user.id,
         action: 'board.synced',
@@ -260,13 +260,13 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.get('/:id/activity', (req, res) => {
+  router.get('/:id/activity', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
-      const events = listActivity(db, req.params.id, req.query.limit);
+      const events = await listActivity(db, req.params.id, req.query.limit);
       return res.json({ success: true, events });
     } catch (err) {
       console.error('读取活动失败:', err);
@@ -274,22 +274,22 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.get('/:id/members', (req, res) => {
+  router.get('/:id/members', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
-      return res.json({ success: true, members: listBoardMembers(db, req.params.id) });
+      return res.json({ success: true, members: await listBoardMembers(db, req.params.id) });
     } catch (err) {
       console.error('读取成员失败:', err);
       return res.status(500).json({ success: false, message: '读取成员失败' });
     }
   });
 
-  router.post('/:id/members', (req, res) => {
+  router.post('/:id/members', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
@@ -297,7 +297,7 @@ export function createBoardsRouter(db, realtime = null) {
         return res.status(403).json({ success: false, message: '仅所有者可邀请成员' });
       }
 
-      const member = addBoardMember(db, {
+      const member = await addBoardMember(db, {
         boardId: req.params.id,
         email: req.body?.email,
         role: req.body?.role,
@@ -305,7 +305,7 @@ export function createBoardsRouter(db, realtime = null) {
       });
 
       emitBoard(req.params.id, 'member.changed', {
-        members: listBoardMembers(db, req.params.id),
+        members: await listBoardMembers(db, req.params.id),
       });
       realtime?.notifyUser(member.userId, {
         type: 'notification',
@@ -320,16 +320,16 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.patch('/:id/members/:userId', (req, res) => {
+  router.patch('/:id/members/:userId', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
       if (!canManageBoard(check.access)) {
         return res.status(403).json({ success: false, message: '仅所有者可修改角色' });
       }
-      const member = updateBoardMemberRole(db, {
+      const member = await updateBoardMemberRole(db, {
         boardId: req.params.id,
         userId: req.params.userId,
         role: req.body?.role,
@@ -338,7 +338,7 @@ export function createBoardsRouter(db, realtime = null) {
         return res.status(404).json({ success: false, message: '成员不存在' });
       }
       emitBoard(req.params.id, 'member.changed', {
-        members: listBoardMembers(db, req.params.id),
+        members: await listBoardMembers(db, req.params.id),
       });
       return res.json({ success: true, member });
     } catch (err) {
@@ -347,22 +347,22 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.delete('/:id/members/:userId', (req, res) => {
+  router.delete('/:id/members/:userId', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
       if (!canManageBoard(check.access)) {
         return res.status(403).json({ success: false, message: '仅所有者可移除成员' });
       }
-      removeBoardMember(db, {
+      await removeBoardMember(db, {
         boardId: req.params.id,
         userId: req.params.userId,
         removedBy: req.user.id,
       });
       emitBoard(req.params.id, 'member.changed', {
-        members: listBoardMembers(db, req.params.id),
+        members: await listBoardMembers(db, req.params.id),
       });
       return res.json({ success: true });
     } catch (err) {
@@ -371,15 +371,15 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.get('/:id/cards/:cardId/comments', (req, res) => {
+  router.get('/:id/cards/:cardId/comments', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
       return res.json({
         success: true,
-        comments: listComments(db, req.params.id, req.params.cardId),
+        comments: await listComments(db, req.params.id, req.params.cardId),
       });
     } catch (err) {
       console.error('读取评论失败:', err);
@@ -387,21 +387,21 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.post('/:id/cards/:cardId/comments', (req, res) => {
+  router.post('/:id/cards/:cardId/comments', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
 
-      const comment = createComment(db, {
+      const comment = await createComment(db, {
         boardId: req.params.id,
         cardId: req.params.cardId,
         userId: req.user.id,
         body: req.body?.body,
       });
 
-      const commentCount = countComments(db, req.params.id, req.params.cardId);
+      const commentCount = await countComments(db, req.params.id, req.params.cardId);
       emitBoard(req.params.id, 'comment.created', {
         cardId: req.params.cardId,
         comment,
@@ -416,13 +416,13 @@ export function createBoardsRouter(db, realtime = null) {
     }
   });
 
-  router.delete('/:id/comments/:commentId', (req, res) => {
+  router.delete('/:id/comments/:commentId', async (req, res) => {
     try {
-      const check = checkAccess(db, req.params.id, req.user.id);
+      const check = await checkAccess(db, req.params.id, req.user.id);
       if (check.error) {
         return res.status(check.error).json({ success: false, message: check.message });
       }
-      const deleted = deleteComment(db, {
+      const deleted = await deleteComment(db, {
         commentId: req.params.commentId,
         userId: req.user.id,
         isOwner: canManageBoard(check.access),
@@ -430,7 +430,7 @@ export function createBoardsRouter(db, realtime = null) {
       if (!deleted) {
         return res.status(404).json({ success: false, message: '评论不存在' });
       }
-      const commentCount = countComments(db, req.params.id, deleted.cardId);
+      const commentCount = await countComments(db, req.params.id, deleted.cardId);
       emitBoard(req.params.id, 'comment.deleted', {
         commentId: req.params.commentId,
         cardId: deleted.cardId,

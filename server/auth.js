@@ -10,10 +10,6 @@ export function isProdRuntime() {
   return process.env.NODE_ENV === 'production' || process.argv.includes('--prod');
 }
 
-/**
- * 生产环境必须显式配置 JWT_SECRET；开发可用默认值并警告。
- * @throws {Error} 生产缺失密钥时抛出
- */
 export function assertAuthConfig() {
   if (process.env.JWT_SECRET) return;
   if (isProdRuntime()) {
@@ -59,7 +55,6 @@ export function signToken(user) {
   );
 }
 
-/** 短时 WS 连接票据，避免把长期 access token 挂在 URL 上 */
 export function signWsTicket(user) {
   return jwt.sign(
     {
@@ -87,11 +82,8 @@ function payloadToUser(payload) {
   };
 }
 
-/**
- * 校验 JWT，并与库中 token_version 比对（登出后旧票失效）。
- */
 export function createRequireAuth(db) {
-  return function requireAuth(req, res, next) {
+  return async function requireAuth(req, res, next) {
     const header = req.headers.authorization || '';
     const match = header.match(/^Bearer\s+(.+)$/i);
     if (!match) {
@@ -103,7 +95,7 @@ export function createRequireAuth(db) {
       if (payload.typ && payload.typ !== 'access') {
         return res.status(401).json({ success: false, message: 'Token 类型无效' });
       }
-      const user = getUserById(db, payload.sub);
+      const user = await getUserById(db, payload.sub);
       if (!user) {
         return res.status(401).json({ success: false, message: '用户不存在' });
       }
@@ -124,12 +116,9 @@ export function createRequireAuth(db) {
   };
 }
 
-/**
- * 校验 WS 短时票据（或兼容旧版 access token，但需通过版本校验）。
- */
-export function authenticateWsCredential(db, tokenOrTicket) {
+export async function authenticateWsCredential(db, tokenOrTicket) {
   const payload = verifyToken(tokenOrTicket);
-  const userRow = getUserById(db, payload.sub);
+  const userRow = await getUserById(db, payload.sub);
   if (!userRow) {
     const err = new Error('user missing');
     err.status = 401;
@@ -155,7 +144,7 @@ export function authenticateWsCredential(db, tokenOrTicket) {
   throw err;
 }
 
-export function revokeUserTokens(db, userId) {
+export async function revokeUserTokens(db, userId) {
   return bumpTokenVersion(db, userId);
 }
 

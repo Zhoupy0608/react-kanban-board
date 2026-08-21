@@ -5,5 +5,9 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.js'],
     fileParallelism: false,
+    pool: 'forks',
+    maxWorkers: 1,
+    testTimeout: 60000,
+    hookTimeout: 60000,
   },
 });

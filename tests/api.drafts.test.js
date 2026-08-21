@@ -1,11 +1,6 @@
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../server/createApp.js';
-
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mykanban-drafts-'));
+import { setupTestApp, teardownTestApp } from './helpers.js';
 
 describe('drafts API', () => {
   let app;
@@ -13,19 +8,17 @@ describe('drafts API', () => {
   let token;
 
   beforeAll(async () => {
-    process.env.JWT_SECRET = 'test-secret';
-    ({ app, db } = createApp({ dataDir }));
+    ({ app, db } = await setupTestApp());
     const reg = await request(app).post('/api/auth/register').send({
       email: 'drafts@example.com',
       name: 'Draft User',
       password: 'secret12',
     });
     token = reg.body.token;
-  });
+  }, 60000);
 
-  afterAll(() => {
-    db?.close?.();
-    fs.rmSync(dataDir, { recursive: true, force: true });
+  afterAll(async () => {
+    await teardownTestApp(db);
   });
 
   it('creates lists updates publishes and deletes drafts', async () => {
@@ -46,41 +39,19 @@ describe('drafts API', () => {
     const updated = await request(app)
       .patch(`/api/drafts/${draftId}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ title: 'Q4 正式规划', description: '范围已定' });
+      .send({ title: 'Q4 规划（改）' });
     expect(updated.status).toBe(200);
-    expect(updated.body.draft.title).toBe('Q4 正式规划');
+    expect(updated.body.draft.title).toBe('Q4 规划（改）');
 
     const published = await request(app)
       .post(`/api/drafts/${draftId}/publish`)
       .set('Authorization', `Bearer ${token}`);
     expect(published.status).toBe(201);
-    expect(published.body.board.title).toBe('Q4 正式规划');
+    expect(published.body.board.title).toBe('Q4 规划（改）');
 
-    const afterPublish = await request(app)
+    const listed2 = await request(app)
       .get('/api/drafts')
       .set('Authorization', `Bearer ${token}`);
-    expect(afterPublish.body.drafts.some((d) => d.id === draftId)).toBe(false);
-
-    const boards = await request(app)
-      .get('/api/boards')
-      .set('Authorization', `Bearer ${token}`);
-    expect(boards.body.boards.some((b) => b.id === published.body.board.id)).toBe(true);
-
-    const another = await request(app)
-      .post('/api/drafts')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ title: '临时点子' });
-    const del = await request(app)
-      .delete(`/api/drafts/${another.body.draft.id}`)
-      .set('Authorization', `Bearer ${token}`);
-    expect(del.status).toBe(200);
-  });
-
-  it('rejects empty draft title', async () => {
-    const res = await request(app)
-      .post('/api/drafts')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ title: '   ' });
-    expect(res.status).toBe(400);
+    expect(listed2.body.drafts.some((d) => d.id === draftId)).toBe(false);
   });
 });

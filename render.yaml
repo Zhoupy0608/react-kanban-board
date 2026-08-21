@@ -9,7 +9,19 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATA_DIR
-        value: /opt/render/project/src/data
+      - key: DB_DRIVER
+        value: mysql
       - key: JWT_SECRET
         generateValue: true
+      - key: MYSQL_HOST
+        sync: false
+      - key: MYSQL_PORT
+        value: '3306'
+      - key: MYSQL_USER
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: MYSQL_DATABASE
+        sync: false
+      - key: REDIS_URL
+        sync: false

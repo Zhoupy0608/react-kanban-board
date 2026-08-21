@@ -20,7 +20,7 @@ const isProd =
 
 async function start() {
   assertAuthConfig();
-  const { app, db, realtime } = createApp();
+  const { app, db, realtime } = await createApp();
 
   if (isProd && fs.existsSync(distDir)) {
     app.use(express.static(distDir));
@@ -45,41 +45,42 @@ async function start() {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   wss.on('connection', (ws, req) => {
-    try {
-      const url = new URL(req.url || '', `http://${req.headers.host}`);
-      // 优先使用短时 ticket；兼容旧客户端的 token 参数
-      const credential = url.searchParams.get('ticket') || url.searchParams.get('token');
-      const boardId = url.searchParams.get('boardId');
-      if (!credential) {
-        ws.close(4401, 'unauthorized');
-        return;
-      }
-      const user = authenticateWsCredential(db, credential);
-      realtime.joinUser(user.id, ws);
-
-      if (boardId) {
-        const access = getBoardAccess(db, boardId, user.id);
-        if (!access) {
-          ws.close(4403, 'forbidden');
+    (async () => {
+      try {
+        const url = new URL(req.url || '', `http://${req.headers.host}`);
+        const credential = url.searchParams.get('ticket') || url.searchParams.get('token');
+        const boardId = url.searchParams.get('boardId');
+        if (!credential) {
+          ws.close(4401, 'unauthorized');
           return;
         }
-        realtime.joinBoard(boardId, ws);
+        const user = await authenticateWsCredential(db, credential);
+        realtime.joinUser(user.id, ws);
+
+        if (boardId) {
+          const access = await getBoardAccess(db, boardId, user.id);
+          if (!access) {
+            ws.close(4403, 'forbidden');
+            return;
+          }
+          realtime.joinBoard(boardId, ws);
+        }
+
+        ws.send(
+          JSON.stringify({
+            type: 'connected',
+            userId: user.id,
+            boardId: boardId || null,
+            at: new Date().toISOString(),
+          })
+        );
+
+        ws.on('close', () => realtime.leave(ws));
+        ws.on('error', () => realtime.leave(ws));
+      } catch {
+        ws.close(4401, 'unauthorized');
       }
-
-      ws.send(
-        JSON.stringify({
-          type: 'connected',
-          userId: user.id,
-          boardId: boardId || null,
-          at: new Date().toISOString(),
-        })
-      );
-
-      ws.on('close', () => realtime.leave(ws));
-      ws.on('error', () => realtime.leave(ws));
-    } catch {
-      ws.close(4401, 'unauthorized');
-    }
+    })();
   });
 
   server.listen(PORT, HOST, () => {
